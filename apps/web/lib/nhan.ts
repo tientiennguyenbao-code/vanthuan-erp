@@ -1,0 +1,43 @@
+/** Tên tiếng Việt cho các mã dùng trong hệ thống. */
+export const VAI_DOI_TAC: Record<string, string> = {
+  nha_cung_cap: 'Nhà cung cấp',
+  nguoi_mua: 'Người mua',
+  ngan_hang: 'Ngân hàng',
+  hang_tau: 'Hãng tàu',
+  giam_dinh: 'Giám định',
+  kho: 'Kho',
+};
+
+export const NHOM_DOI_TAC: Record<string, string> = {
+  htx: 'Hợp tác xã',
+  nong_trai: 'Nông trại liên kết',
+  nha_may: 'Nhà máy',
+  doanh_nghiep_thuong_mai: 'Doanh nghiệp thương mại',
+  nha_nhap_khau: 'Nhà nhập khẩu',
+  nha_phan_phoi: 'Nhà phân phối',
+  nha_che_bien: 'Nhà chế biến',
+  ngan_hang: 'Ngân hàng',
+  hang_tau: 'Hãng tàu',
+  giam_dinh: 'Đơn vị giám định',
+  kho: 'Kho bãi',
+  khac: 'Khác',
+};
+
+export const TRANG_THAI_KYC: Record<string, string> = {
+  nhap: 'Nháp',
+  cho_tham_dinh: 'Chờ thẩm định',
+  dat: 'Đạt',
+  tu_choi: 'Bị từ chối',
+  het_han: 'Hết hạn thẩm định',
+};
+
+export const RUI_RO: Record<string, string> = { thap: 'Thấp', trung_binh: 'Trung bình', cao: 'Cao' };
+
+export const NGANH: Record<string, string> = { ca_phe: 'Cà phê', gia_vi: 'Gia vị', thuy_san: 'Thủy sản' };
+
+export const LOAI_CO_SO: Record<string, string> = { kho: 'Kho', xuong_so_che: 'Xưởng sơ chế' };
+export const HINH_THUC_CO_SO: Record<string, string> = { thue: 'Đi thuê', cua_nha_cung_cap: 'Của nhà cung cấp', tu_van_hanh: 'Tự đầu tư vận hành' };
+
+export function ngay(v: string | null | undefined): string {
+  return v ? new Date(v).toLocaleDateString('vi-VN') : '—';
+}
