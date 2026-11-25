@@ -63,3 +63,6 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--
 .kyc-canh-bao { color: var(--loi); font-weight: 600; }
 textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--vien); border-radius: 8px; background: var(--the); color: var(--chu); font: inherit; min-height: 70px; }
 .huy { opacity: 0.55; text-decoration: line-through; }
+.bang-gon { min-width: 0; }
+.bang-gon td, .bang-gon th { padding: 4px 0; }
+.o-tien { min-width: 90px; }

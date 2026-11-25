@@ -36,6 +36,13 @@
       "when": 1795616719539,
       "tag": "0004_so_cai_chi_ghi_them",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795617636206,
+      "tag": "0005_bao_gia",
+      "breakpoints": true
     }
   ]
 }
