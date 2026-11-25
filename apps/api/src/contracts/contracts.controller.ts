@@ -48,6 +48,8 @@ const createSchema = z.object({
   nguoiPhuTrachId: z.uuid().nullish(),
   dieuKhoan: termsSchema,
 });
+const feeApproveSchema = z.object({ ghiChu: z.string().trim().max(500).optional() });
+const feeFloorSchema = z.object({ sanTyLePhi: z.number().min(0).max(100).nullable() });
 const reasonSchema = z.object({ lyDo: z.string().trim().min(3, 'Ghi lý do').max(500) });
 const signSchema = z.object({ ma2Lop: z.string().trim().regex(/^\d{6}$/, 'Mã 2 lớp gồm 6 chữ số') });
 const amendSchema = z.object({ lyDo: z.string().trim().min(3, 'Ghi lý do lập phụ lục').max(500), dieuKhoan: termsSchema });
@@ -115,6 +117,14 @@ export class ContractsController {
     return { ok: true };
   }
 
+  @RequirePermissions('PHI_DUYET_TY_LE')
+  @Post(':id/duyet-phi')
+  @HttpCode(200)
+  async approveFee(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
+    await this.contracts.approveFee(id, parseBody(feeApproveSchema, body ?? {}).ghiChu ?? null, ctx);
+    return { ok: true };
+  }
+
   @RequirePermissions('HOP_DONG_DUYET_KY')
   @Post(':id/tra-lai')
   @HttpCode(200)
@@ -175,6 +185,29 @@ export class SignAuthorizationsController {
   @HttpCode(200)
   async revoke(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
     await this.contracts.revokeAuthorization(id, parseBody(reasonSchema, body).lyDo, ctx);
+    return { ok: true };
+  }
+}
+
+@Controller('phi')
+export class FeesController {
+  constructor(private readonly contracts: ContractsService) {}
+
+  @Get('goi-y')
+  suggest(@Query('matHangId') matHangId: string | undefined, @CurrentAuth() ctx: AuthContext) {
+    if (matHangId && !/^[0-9a-f-]{36}$/i.test(matHangId)) return this.contracts.suggestFeeRate(undefined, ctx);
+    return this.contracts.suggestFeeRate(matHangId || undefined, ctx);
+  }
+
+  @Get('muc-san')
+  async floor() {
+    return { sanTyLePhi: await this.contracts.feeFloor() };
+  }
+
+  @RequirePermissions('PHI_DUYET_TY_LE')
+  @Put('muc-san')
+  async setFloor(@Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
+    await this.contracts.setFeeFloor(parseBody(feeFloorSchema, body).sanTyLePhi, ctx);
     return { ok: true };
   }
 }

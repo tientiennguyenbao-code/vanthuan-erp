@@ -445,3 +445,13 @@ export const quoteCostLines = pgTable(
 
 export type Quote = typeof quotes.$inferSelect;
 export type QuoteCostLine = typeof quoteCostLines.$inferSelect;
+
+// ============ Cấu hình ============
+
+/** Cấu hình nghiệp vụ dạng khoá – giá trị (ví dụ mức sàn phí trọn gói). Mọi thay đổi ghi nhật ký. */
+export const settings = pgTable('settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull(),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

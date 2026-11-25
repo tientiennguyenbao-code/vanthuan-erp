@@ -28,3 +28,12 @@ Soạn (`nhap`) → Trình ký (`cho_ky`, nội dung bị khoá) → Ký (`da_ky
 2. **Neo ra blockchain công khai**: đang neo nội bộ (`InternalAnchorProvider`). Ghi lên Polygon / OpenTimestamps cần ví và một ít phí; thay qua `AnchorProvider`.
 3. Hạn mức duyệt hợp đồng theo giá trị cho cả Giám đốc (thiết kế mục 2) và tỷ lệ phí dưới sàn: làm cùng phần báo giá và phí.
 4. Bản PDF hợp đồng song ngữ có mã QR xác minh: làm sau khi có mẫu hợp đồng.
+
+## Phí trọn gói
+
+- Hợp đồng mua (mua đứt) và hợp đồng môi giới mang tỷ lệ phí trọn gói; thiếu tỷ lệ thì không trình ký được.
+- Ban Giám đốc đặt **mức sàn** tại trang *Hợp đồng → Mức sàn phí* (`PUT /api/phi/muc-san`). Mỗi lần đổi đều ghi nhật ký.
+- Hợp đồng có tỷ lệ thấp hơn mức sàn vẫn trình ký được, nhưng **không ký được** cho tới khi Ban Giám đốc bấm *Duyệt phí* (`POST /api/hop-dong/:id/duyet-phi`). Người trình không tự duyệt (4 mắt).
+- Việc duyệt ghi vào sổ cái (sự kiện `duyet_phi`) và gắn với mã băm nội dung: sửa điều khoản hay lập phụ lục thì phải duyệt lại.
+- Gợi ý tỷ lệ (`GET /api/phi/goi-y?matHangId=`): số thống kê (phổ biến, trung bình, thấp nhất, cao nhất) từ các hợp đồng mang phí đã ký, không lộ hợp đồng cụ thể.
+- Việc tính và thu phí theo từng lô (khi giao hàng) làm cùng phần lô hàng.

@@ -9,7 +9,7 @@ import { decrypt, encrypt, sha256Hex } from '../common/crypto';
 import { stableStringify } from '../common/stable-json';
 import { loadConfig } from '../config/config';
 import { DB, Db, DbExecutor } from '../db/db';
-import { commodities, Contract, contractVersions, contracts, partnerRoles, partners, signAuthorizations, userRoles, users } from '../db/schema';
+import { commodities, Contract, contractLedger, contractVersions, contracts, partnerRoles, partners, settings, signAuthorizations, userRoles, users } from '../db/schema';
 import { isKycValid, KycStatus } from '../partners/partner.rules';
 import {
   checkParties,
@@ -18,6 +18,8 @@ import {
   ContractTerms,
   contractValue,
   contractValueUsd,
+  FEE_BEARING_KINDS,
+  feeNeedsApproval,
   normalizeVerificationCode,
   PARTY_RULES,
   readinessProblems,
@@ -35,6 +37,8 @@ export interface CreateContractInput {
   ownerUserId?: string | null;
   terms: ContractTerms;
 }
+
+export const FEE_FLOOR_KEY = 'phi_tron_goi.san_ty_le';
 
 const seller = alias(partners, 'ben_ban');
 const buyer = alias(partners, 'ben_mua');
@@ -131,7 +135,11 @@ export class ContractsService {
 
     const current = versions.find((v) => v.v.version === c.currentVersion)!;
     const terms = this.readTerms(current.v.contentEnc, key);
+    const floor = await this.feeFloor();
+    const feeApproved = await this.feeApproved(c, current.v.contentHash, this.db);
+    const needsFee = FEE_BEARING_KINDS.includes(c.kind as ContractKind);
     const perms = this.actionsFor(c, current.v, ctx);
+    const feeBelowFloor = needsFee && feeNeedsApproval(terms.tyLePhiPhanTram, floor);
 
     return {
       id: c.id,
@@ -153,7 +161,10 @@ export class ContractsService {
       terms,
       giaTri: contractValue(terms),
       giaTriUsd: contractValueUsd(terms),
-      thieuSot: readinessProblems(terms),
+      thieuSot: readinessProblems(terms, c.kind as ContractKind),
+      phi: needsFee
+        ? { tyLe: terms.tyLePhiPhanTram ?? null, san: floor, duoiSan: feeBelowFloor, daDuyet: feeApproved }
+        : null,
       versions: versions.map((v) => ({
         version: v.v.version,
         contentHash: v.v.contentHash,
@@ -166,7 +177,10 @@ export class ContractsService {
         createdAt: v.v.createdAt,
       })),
       ledger: ledgerRows,
-      quyen: perms,
+      quyen: {
+        ...perms,
+        duyetPhi: feeBelowFloor && !feeApproved && c.status === 'cho_ky' && ctx.permissions.includes('PHI_DUYET_TY_LE') && current.v.submittedBy !== ctx.user.id,
+      },
     };
   }
 
@@ -241,7 +255,7 @@ export class ContractsService {
       if (c.status !== 'nhap') throw new BadRequestException('Hợp đồng không ở trạng thái đang soạn');
       const v = await this.currentVersion(c, tx);
       const terms = this.readTerms(v.contentEnc, this.dataKey(c));
-      const problems = readinessProblems(terms);
+      const problems = readinessProblems(terms, c.kind as ContractKind);
       if (problems.length) throw new BadRequestException(`Chưa trình ký được: ${problems.join('; ')}`);
       await this.assertPartiesUsable(c.kind as ContractKind, c.sellerPartnerId, c.buyerPartnerId, tx);
       const now = new Date();
@@ -252,6 +266,92 @@ export class ContractsService {
       await tx.update(contracts).set({ status: 'cho_ky', updatedAt: now }).where(eq(contracts.id, id));
       await this.ledger.append({ contractId: id, version: c.currentVersion, event: 'trinh_ky', actorUserId: ctx.user.id, contentHash: v.contentHash }, tx);
     });
+  }
+
+  /**
+   * Ban Giám đốc duyệt tỷ lệ phí dưới mức sàn cho đúng phiên bản đang chờ ký.
+   * Duyệt gắn với mã băm nội dung: sửa hợp đồng sau đó thì phải duyệt lại.
+   */
+  async approveFee(id: string, note: string | null, ctx: AuthContext) {
+    await this.db.transaction(async (tx) => {
+      const c = await this.lockContract(id, tx);
+      if (c.status !== 'cho_ky') throw new BadRequestException('Chỉ duyệt phí khi hợp đồng đang chờ ký');
+      const v = await this.currentVersion(c, tx);
+      if (v.submittedBy === ctx.user.id) throw new ForbiddenException('Người trình không tự duyệt phí của mình (nguyên tắc 4 mắt)');
+      const terms = this.readTerms(v.contentEnc, this.dataKey(c));
+      const floor = await this.feeFloor(tx);
+      if (!feeNeedsApproval(terms.tyLePhiPhanTram, floor)) throw new BadRequestException('Tỷ lệ phí không thấp hơn mức sàn, không cần duyệt');
+      if (await this.feeApproved(c, v.contentHash, tx)) throw new BadRequestException('Phí của phiên bản này đã được duyệt');
+      await this.ledger.append(
+        {
+          contractId: id,
+          version: c.currentVersion,
+          event: 'duyet_phi',
+          actorUserId: ctx.user.id,
+          contentHash: v.contentHash,
+          note: `Tỷ lệ ${terms.tyLePhiPhanTram}% dưới sàn ${floor}%${note ? ': ' + note : ''}`,
+        },
+        tx,
+      );
+    });
+  }
+
+  /** Mức sàn phí trọn gói (%); null nghĩa là chưa đặt. */
+  async feeFloor(exec: DbExecutor = this.db): Promise<number | null> {
+    const [row] = await exec.select().from(settings).where(eq(settings.key, FEE_FLOOR_KEY));
+    return row ? ((row.value as { tyLe: number | null }).tyLe ?? null) : null;
+  }
+
+  async setFeeFloor(pct: number | null, ctx: AuthContext) {
+    await this.db.transaction(async (tx) => {
+      const before = await this.feeFloor(tx);
+      await tx
+        .insert(settings)
+        .values({ key: FEE_FLOOR_KEY, value: { tyLe: pct }, updatedBy: ctx.user.id })
+        .onConflictDoUpdate({ target: settings.key, set: { value: { tyLe: pct }, updatedBy: ctx.user.id, updatedAt: new Date() } });
+      await this.audit.record({ actorUserId: ctx.user.id, action: 'phi.dat_muc_san', entityType: 'setting', entityId: FEE_FLOOR_KEY, detail: { truoc: before, sau: pct } }, tx);
+    });
+  }
+
+  /**
+   * Tỷ lệ phí tham khảo từ các hợp đồng mang phí đã ký (cùng mặt hàng nếu có), dùng phiên bản đang hiệu lực.
+   * Chỉ trả về số thống kê, không lộ hợp đồng cụ thể.
+   */
+  async suggestFeeRate(commodityId: string | undefined, ctx: AuthContext) {
+    this.assertCanDraft(ctx);
+    const conds = [inArray(contracts.kind, [...FEE_BEARING_KINDS]), sql`${contracts.signedVersion} is not null`, sql`${contracts.status} <> 'da_huy'`];
+    if (commodityId) conds.push(eq(contracts.commodityId, commodityId));
+    const rows = await this.db
+      .select({ c: contracts, contentEnc: contractVersions.contentEnc })
+      .from(contracts)
+      .innerJoin(contractVersions, and(eq(contractVersions.contractId, contracts.id), eq(contractVersions.version, contracts.signedVersion)))
+      .where(and(...conds));
+    const rates = rows
+      .map((r) => this.readTerms(r.contentEnc, this.dataKey(r.c)).tyLePhiPhanTram)
+      .filter((x): x is number => typeof x === 'number')
+      .sort((a, b) => a - b);
+    const san = await this.feeFloor();
+    if (!rates.length) return { soHopDong: 0, trungBinh: null, trungVi: null, thapNhat: null, caoNhat: null, san };
+    const mid = Math.floor(rates.length / 2);
+    const median = rates.length % 2 ? rates[mid] : (rates[mid - 1] + rates[mid]) / 2;
+    const r3 = (v: number) => Math.round(v * 1000) / 1000;
+    return {
+      soHopDong: rates.length,
+      trungBinh: r3(rates.reduce((a, b) => a + b, 0) / rates.length),
+      trungVi: r3(median),
+      thapNhat: rates[0],
+      caoNhat: rates[rates.length - 1],
+      san,
+    };
+  }
+
+  private async feeApproved(c: Contract, contentHash: string, exec: DbExecutor): Promise<boolean> {
+    const [row] = await exec
+      .select({ id: contractLedger.id })
+      .from(contractLedger)
+      .where(and(eq(contractLedger.contractId, c.id), eq(contractLedger.event, 'duyet_phi'), eq(contractLedger.version, c.currentVersion), eq(contractLedger.contentHash, contentHash)))
+      .limit(1);
+    return !!row;
   }
 
   /** Người ký trả lại để sửa, kèm lý do. */
@@ -525,6 +625,12 @@ export class ContractsService {
       .where(eq(signAuthorizations.granteeUserId, ctx.user.id));
     const refusal = signingRefusal(ctx.roles, contractValueUsd(terms), auths);
     if (refusal) throw new ForbiddenException(refusal);
+    if (FEE_BEARING_KINDS.includes(c.kind as ContractKind)) {
+      const floor = await this.feeFloor(tx);
+      if (feeNeedsApproval(terms.tyLePhiPhanTram, floor) && !(await this.feeApproved(c, version.contentHash, tx))) {
+        throw new ForbiddenException(`Tỷ lệ phí ${terms.tyLePhiPhanTram}% thấp hơn mức sàn ${floor}%: cần Ban Giám đốc duyệt phí trước khi ký`);
+      }
+    }
     await this.assertPartiesUsable(c.kind as ContractKind, c.sellerPartnerId, c.buyerPartnerId, tx);
     return { version, terms };
   }

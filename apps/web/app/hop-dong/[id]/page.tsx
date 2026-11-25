@@ -17,6 +17,7 @@ interface ChiTiet {
   status: string;
   sellerName: string | null;
   buyerName: string | null;
+  commodityId: string;
   commodityName: string;
   ownerName: string;
   currentVersion: number;
@@ -26,12 +27,13 @@ interface ChiTiet {
   giaTri: number;
   giaTriUsd: number | null;
   thieuSot: string[];
+  phi: { tyLe: number | null; san: number | null; duoiSan: boolean; daDuyet: boolean } | null;
   versions: { version: number; contentHash: string; maXacMinh: string; reason: string | null; submittedAt: string | null; submittedByName: string | null; signedAt: string | null; signedByName: string | null }[];
   ledger: { id: number; at: string; version: number; event: string; contentHash: string; note: string | null; hash: string; actorName: string; signature: { provider: string } | null }[];
-  quyen: { sua: boolean; trinhKy: boolean; ky: boolean; traLai: boolean; phuLuc: boolean; huy: boolean };
+  quyen: { sua: boolean; trinhKy: boolean; ky: boolean; traLai: boolean; phuLuc: boolean; huy: boolean; duyetPhi: boolean };
 }
 
-type Hop = '' | 'sua' | 'ky' | 'traLai' | 'phuLuc' | 'huy';
+type Hop = '' | 'sua' | 'ky' | 'traLai' | 'phuLuc' | 'huy' | 'duyetPhi';
 
 export default function ChiTietHopDong() {
   const toi = useToi();
@@ -99,7 +101,18 @@ export default function ChiTietHopDong() {
           <strong>Giá trị</strong>
           <div style={{ fontSize: 20 }}>{tien(hd.giaTri, t.tienTe)}</div>
           {t.tienTe !== 'USD' && <div className="phu">≈ {tien(hd.giaTriUsd, 'USD')} (tỷ giá {tien(t.tyGiaUsd)})</div>}
-          {t.tyLePhiPhanTram !== null && <div className="phu">Phí trọn gói {t.tyLePhiPhanTram}%</div>}
+          {hd.phi ? (
+            <div style={{ marginTop: 6 }}>
+              Phí trọn gói: <strong>{hd.phi.tyLe ?? '—'}{hd.phi.tyLe !== null && '%'}</strong>
+              {hd.phi.tyLe !== null && <span className="phu"> ≈ {tien(Math.round(hd.giaTri * hd.phi.tyLe) / 100, t.tienTe)}</span>}
+              {hd.phi.san !== null && <div className="phu">Mức sàn: {hd.phi.san}%</div>}
+              {hd.phi.duoiSan && (hd.phi.daDuyet
+                ? <div className="kyc-dat">Dưới mức sàn, đã được Ban Giám đốc duyệt</div>
+                : <div className="kyc-canh-bao">Dưới mức sàn: cần Ban Giám đốc duyệt phí trước khi ký</div>)}
+            </div>
+          ) : (
+            t.tyLePhiPhanTram !== null && <div className="phu">Phí trọn gói {t.tyLePhiPhanTram}%</div>
+          )}
         </div>
         <div className="o">
           <strong>Mã xác minh</strong>
@@ -134,6 +147,7 @@ export default function ChiTietHopDong() {
       <div className="hang" style={{ marginTop: 16 }}>
         {hd.quyen.sua && <button className="phu-btn" onClick={() => setMo(mo === 'sua' ? '' : 'sua')}>Sửa điều khoản</button>}
         {hd.quyen.trinhKy && <button onClick={() => lam(() => api(`/hop-dong/${id}/trinh-ky`, { method: 'POST' }), 'Đã trình ký. Nội dung được khoá cho tới khi ký hoặc bị trả lại.')}>Trình ký</button>}
+        {hd.quyen.duyetPhi && <button onClick={() => setMo(mo === 'duyetPhi' ? '' : 'duyetPhi')}>Duyệt phí</button>}
         {hd.quyen.ky && <button onClick={() => setMo(mo === 'ky' ? '' : 'ky')}>Ký hợp đồng</button>}
         {hd.quyen.traLai && <button className="phu-btn" onClick={() => setMo(mo === 'traLai' ? '' : 'traLai')}>Trả lại để sửa</button>}
         {hd.quyen.phuLuc && <button className="phu-btn" onClick={() => setMo(mo === 'phuLuc' ? '' : 'phuLuc')}>Lập phụ lục</button>}
@@ -156,7 +170,7 @@ export default function ChiTietHopDong() {
               <input id="ldpl" required minLength={3} value={lyDo} onChange={(e) => setLyDo(e.target.value)} placeholder="VD: Giảm giá do giám định độ ẩm 13%" />
             </>
           )}
-          <NhapDieuKhoan v={dk} doi={setDk} />
+          <NhapDieuKhoan v={dk} doi={setDk} matHangId={hd.commodityId} coPhi={hd.phi !== null} />
           <button style={{ marginTop: 16 }}>{mo === 'sua' ? 'Lưu điều khoản' : 'Tạo phụ lục'}</button>
         </form>
       )}
@@ -169,6 +183,15 @@ export default function ChiTietHopDong() {
           <input id="ma2" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" maxLength={6} required value={ma} onChange={(e) => setMa(e.target.value)} />
           <p className="phu">Chữ ký hiện là chữ ký nội bộ tạm thời; sẽ thay bằng chữ ký số MISA eSign khi công ty có hợp đồng dịch vụ.</p>
           <button>Xác nhận ký</button>
+        </form>
+      )}
+
+      {mo === 'duyetPhi' && hd.phi && (
+        <form className="o" style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); lam(() => api(`/hop-dong/${id}/duyet-phi`, { body: { ghiChu: lyDo || undefined } }), 'Đã duyệt phí. Việc duyệt được ghi vào sổ cái; nếu hợp đồng bị sửa thì phải duyệt lại.'); }}>
+          <p>Duyệt tỷ lệ phí <strong>{hd.phi.tyLe}%</strong>, thấp hơn mức sàn <strong>{hd.phi.san}%</strong>, cho phiên bản {hd.currentVersion} của hợp đồng này.</p>
+          <label htmlFor="ldp">Lý do chấp nhận (không bắt buộc)</label>
+          <input id="ldp" value={lyDo} onChange={(e) => setLyDo(e.target.value)} placeholder="VD: Khách hàng chiến lược, lô đầu tiên" />
+          <button style={{ marginTop: 12 }}>Xác nhận duyệt phí</button>
         </form>
       )}
 
