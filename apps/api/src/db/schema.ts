@@ -634,3 +634,140 @@ export const lotEvents = pgTable(
 export type PurchaseLot = typeof purchaseLots.$inferSelect;
 export type ExportLot = typeof exportLots.$inferSelect;
 export type LotAllocation = typeof lotAllocations.$inferSelect;
+
+// ============ Chứng từ ============
+
+/**
+ * Quy tắc chứng từ: ngành × thị trường × Incoterms × loại giao dịch → một loại chứng từ.
+ * Để trống ngành, thị trường, Incoterms hay loại giao dịch nghĩa là áp cho mọi giá trị.
+ */
+export const docRules = pgTable(
+  'doc_rules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    /** ca_phe | gia_vi | thuy_san | null */
+    sector: text('sector'),
+    /** US | EU | CN | null */
+    market: text('market'),
+    /** Danh sách Incoterms áp dụng; null là mọi điều kiện */
+    incoterms: jsonb('incoterms'),
+    /** mua_dut | moi_gioi | null */
+    dealType: text('deal_type'),
+    /** bb: bắt buộc theo quy định · nm: người mua hoặc L/C yêu cầu */
+    requirement: text('requirement').notNull(),
+    /** truoc_xep_tau | sau_xep_tau */
+    stage: text('stage').notNull(),
+    /**
+     * lo: một bản cho cả lô · nguoi_xuat_khau: một bản cho lô mua đứt, một bản mỗi nhà cung cấp với môi giới ·
+     * nha_cung_cap: một bản mỗi nhà cung cấp trong lô (đăng ký cơ sở, EUDR...)
+     */
+    scope: text('scope').notNull(),
+    /** Ai lập: van_thuan | nha_cung_cap | nguoi_nhap | ben_xuat_khau */
+    party: text('party').notNull(),
+    issuer: text('issuer'),
+    legalBasis: text('legal_basis'),
+    /** Còn điểm chưa chắc chắn, cần xác minh */
+    uncertain: boolean('uncertain').notNull().default(false),
+    note: text('note'),
+    reviewedAt: text('reviewed_at').notNull(),
+    active: boolean('active').notNull().default(true),
+    updatedBy: uuid('updated_by').references(() => users.id),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('doc_rules_market_idx').on(t.market, t.sector)],
+);
+
+/** Một dòng trong checklist chứng từ của lô xuất. */
+export const lotDocuments = pgTable(
+  'lot_documents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    ruleId: uuid('rule_id').references(() => docRules.id),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    requirement: text('requirement').notNull(),
+    stage: text('stage').notNull(),
+    party: text('party').notNull(),
+    issuer: text('issuer'),
+    /** Nhà cung cấp mà dòng này thuộc về (khi tách theo nhà cung cấp) */
+    supplierPartnerId: uuid('supplier_partner_id').references(() => partners.id),
+    /** thieu | dang_xin | nhap | da_duyet | da_gui | khong_ap_dung */
+    status: text('status').notNull().default('thieu'),
+    number: text('number'),
+    issuedOn: text('issued_on'),
+    expiresOn: text('expires_on'),
+    note: text('note'),
+    /** Dòng không còn áp dụng sau khi đổi phân bổ (giữ lại để tra cứu) */
+    obsolete: boolean('obsolete').notNull().default(false),
+    updatedBy: uuid('updated_by').references(() => users.id),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    approvedBy: uuid('approved_by').references(() => users.id),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('lot_documents_lot_idx').on(t.exportLotId),
+    uniqueIndex('lot_documents_uq').on(t.exportLotId, t.code, sql`coalesce(${t.supplierPartnerId}, '00000000-0000-0000-0000-000000000000'::uuid)`),
+  ],
+);
+
+/**
+ * Đề nghị thu phí trọn gói, sinh khi lô xuất sang "xếp tàu": mỗi lô mua trong lô một dòng,
+ * phí = khối lượng phân bổ × đơn giá hợp đồng đối ứng × tỷ lệ phí của hợp đồng mang phí.
+ */
+export const feeRequests = pgTable(
+  'fee_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    purchaseLotId: uuid('purchase_lot_id')
+      .notNull()
+      .references(() => purchaseLots.id),
+    supplierPartnerId: uuid('supplier_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    feeContractId: uuid('fee_contract_id')
+      .notNull()
+      .references(() => contracts.id),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    unitPricePerKg: numeric('unit_price_per_kg', { precision: 18, scale: 6, mode: 'number' }).notNull(),
+    currency: text('currency').notNull(),
+    baseValue: numeric('base_value', { precision: 18, scale: 2, mode: 'number' }).notNull(),
+    ratePct: numeric('rate_pct', { precision: 6, scale: 3, mode: 'number' }),
+    amount: numeric('amount', { precision: 18, scale: 2, mode: 'number' }),
+    fxPerUsd: numeric('fx_per_usd', { precision: 18, scale: 4, mode: 'number' }),
+    blNumber: text('bl_number').notNull(),
+    blDate: text('bl_date').notNull(),
+    /** cho_duyet | da_duyet | thieu_ty_le */
+    status: text('status').notNull(),
+    approvedBy: uuid('approved_by').references(() => users.id),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('fee_requests_lot_idx').on(t.exportLotId), uniqueIndex('fee_requests_uq').on(t.exportLotId, t.purchaseLotId)],
+);
+
+/** Giám đốc mở cổng chặn xếp tàu khi thiếu chứng từ; dùng một lần cho lần xếp tàu kế tiếp. */
+export const gateOverrides = pgTable('gate_overrides', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  exportLotId: uuid('export_lot_id')
+    .notNull()
+    .references(() => exportLots.id),
+  reason: text('reason').notNull(),
+  /** Các chứng từ còn thiếu lúc mở chặn */
+  missing: jsonb('missing').notNull(),
+  grantedBy: uuid('granted_by')
+    .notNull()
+    .references(() => users.id),
+  grantedAt: timestamp('granted_at', { withTimezone: true }).notNull().defaultNow(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+});
+
+export type DocRule = typeof docRules.$inferSelect;
+export type LotDocument = typeof lotDocuments.$inferSelect;

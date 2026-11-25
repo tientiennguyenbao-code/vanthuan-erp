@@ -38,6 +38,13 @@ export const SU_KIEN_LO: Record<string, string> = {
   giam_dinh: 'Giám định',
   booking: 'Cập nhật booking',
   chuyen_buoc: 'Chuyển bước',
+  checklist: 'Cập nhật checklist',
+  chung_tu: 'Cập nhật chứng từ',
+  duyet_chung_tu: 'Duyệt chứng từ',
+  tra_lai_chung_tu: 'Trả lại chứng từ',
+  gui_chung_tu: 'Gửi chứng từ',
+  khong_ap_dung: 'Chứng từ không áp dụng',
+  mo_chan: 'Giám đốc mở chặn xếp tàu',
 };
 
 export function kg(v: number | null | undefined): string {

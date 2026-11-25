@@ -197,6 +197,13 @@ describe('Lô hàng: lô mua, lô xuất, phân bổ, giám định, booking', (
       .expect(200);
     await nv.post(`/api/lo-xuat/${ids.lxA}/chuyen-buoc`).send({}).expect(400);
     await nv2.post(`/api/lo-xuat/${ids.lxA}/chuyen-buoc`).send({ soVanDon: 'MAEU2611', ngayTauChay: '2027-01-21' }).expect(403);
+    // Chứng từ được kiểm thử riêng ở documents.e2e; ở đây đánh dấu không áp dụng để qua cổng chứng từ
+    const noDocs = await nv.post(`/api/lo-xuat/${ids.lxA}/chuyen-buoc`).send({ soVanDon: 'MAEU2611', ngayTauChay: '2027-01-21' }).expect(400);
+    expect(noDocs.body.message).toMatch(/chứng từ bắt buộc trước xếp tàu/);
+    const ct = await tp.get(`/api/lo-xuat/${ids.lxA}/chung-tu`).expect(200);
+    for (const d of ct.body.chungTu.filter((x: { requirement: string; stage: string; obsolete: boolean }) => x.requirement === 'bb' && x.stage === 'truoc_xep_tau' && !x.obsolete)) {
+      await tp.post(`/api/chung-tu/${d.id}/khong-ap-dung`).send({ lyDo: 'Kiểm thử luồng lô hàng' }).expect(204);
+    }
     const ok = await nv.post(`/api/lo-xuat/${ids.lxA}/chuyen-buoc`).send({ soVanDon: 'MAEU2611', ngayTauChay: '2027-01-21' }).expect(200);
     expect(ok.body.status).toBe('xep_tau');
     const g = await nv.get(`/api/lo-xuat/${ids.lxA}`).expect(200);

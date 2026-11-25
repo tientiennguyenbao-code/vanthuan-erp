@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { ChecklistChungTu } from '@/lib/chung-tu';
 import { CacBuoc, Den, kg, LOAI_GIAO_DICH, NhatKy, SuKienLo, THI_TRUONG, TRANG_THAI_LO_XUAT } from '@/lib/lo-hang';
 import { ngay, ngayGio } from '@/lib/nhan';
 import { useToi } from '@/lib/use-toi';
@@ -311,6 +312,16 @@ export default function ChiTietLoXuat() {
             <button className="phu-btn" style={{ marginTop: 12 }}>Xác nhận huỷ</button>
           </form>
         </details>
+      )}
+
+      {lo.status !== 'da_huy' && (
+        <>
+          <h2>Chứng từ</h2>
+          <ChecklistChungTu loId={lo.id} onDoi={() => tai().catch((e: Error) => setLoi(e.message))} />
+        </>
+      )}
+      {lo.blNumber && (
+        <p style={{ marginTop: 16 }}><Link href={`/lo-hang/thu-phi?loXuatId=${lo.id}`}>Đề nghị thu phí của lô này</Link></p>
       )}
 
       <h2>Nhật ký lô</h2>

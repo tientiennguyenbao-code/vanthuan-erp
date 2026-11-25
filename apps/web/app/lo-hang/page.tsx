@@ -86,7 +86,11 @@ export default function BangDieuPhoi() {
       <h1>Bảng điều phối lô hàng</h1>
       <p className="phu">
         Mỗi lô xuất ứng với một hợp đồng đối ứng và một booking. Đèn đỏ: còn 3 ngày hoặc ít hơn đến cut-off mà lô chưa xếp tàu, hoặc giám định không đạt.
-        {' · '}<Link href="/lo-hang/lo-mua">Lô mua (thu gom, sơ chế, nhập kho)</Link>
+      </p>
+      <p>
+        <Link href="/lo-hang/lo-mua">Lô mua (thu gom, sơ chế, nhập kho)</Link>
+        {toi.quyen.some((q) => ['MA_TRAN_DUYET', 'CHUNG_TU_XEM_TAT_CA', 'CHUNG_TU_KIEM_TRA'].includes(q)) && <>{' · '}<Link href="/lo-hang/quy-tac-chung-tu">Quy tắc chứng từ</Link></>}
+        {toi.quyen.some((q) => ['PHI_XEM_TAT_CA', 'PHI_XEM_CUA_MINH'].includes(q)) && <>{' · '}<Link href="/lo-hang/thu-phi">Đề nghị thu phí</Link></>}
       </p>
       {canhBao > 0 && <div className="loi" role="alert">{canhBao} lô cần xử lý gấp.</div>}
       {loi && <div className="loi" role="alert">{loi}</div>}
