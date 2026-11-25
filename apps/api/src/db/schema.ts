@@ -102,3 +102,126 @@ export const auditLog = pgTable(
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type AuditEntry = typeof auditLog.$inferSelect;
+
+// ============ Danh mục ============
+
+/** Mặt hàng: thêm ngành hay mặt hàng mới chỉ là thêm dòng, không sửa phần mềm. */
+export const commodities = pgTable(
+  'commodities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    /** 'ca_phe' | 'gia_vi' | 'thuy_san' */
+    sector: text('sector').notNull(),
+    hsCode: text('hs_code'),
+    /** Các chỉ tiêu quy cách (ví dụ độ ẩm, tạp chất, sàng). */
+    specFields: jsonb('spec_fields').notNull().default([]),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('commodities_code_uq').on(t.code)],
+);
+
+// ============ Đối tác ============
+
+/** Một bảng chung cho mọi đối tác; một đơn vị có thể mang nhiều vai (vừa bán vừa mua). */
+export const partners = pgTable(
+  'partners',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    country: text('country').notNull(),
+    taxCode: text('tax_code'),
+    address: text('address'),
+    /** Phân nhóm: htx, nong_trai, nha_may, doanh_nghiep_thuong_mai, nha_nhap_khau, nha_phan_phoi, nha_che_bien, ngan_hang, hang_tau, giam_dinh, kho, khac */
+    category: text('category').notNull(),
+    /** Nhân viên kinh doanh phụ trách */
+    ownerUserId: uuid('owner_user_id').references(() => users.id),
+    /** Trạng thái thẩm định: nhap | cho_tham_dinh | dat | tu_choi */
+    kycStatus: text('kyc_status').notNull().default('nhap'),
+    /** Xếp hạng rủi ro: thap | trung_binh | cao */
+    riskRating: text('risk_rating'),
+    screeningNote: text('screening_note'),
+    screenedAt: timestamp('screened_at', { withTimezone: true }),
+    kycSubmittedBy: uuid('kyc_submitted_by').references(() => users.id),
+    kycApprovedBy: uuid('kyc_approved_by').references(() => users.id),
+    kycApprovedAt: timestamp('kyc_approved_at', { withTimezone: true }),
+    kycExpiresAt: timestamp('kyc_expires_at', { withTimezone: true }),
+    kycRejectReason: text('kyc_reject_reason'),
+    createdBy: uuid('created_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('partners_code_uq').on(t.code), index('partners_owner_idx').on(t.ownerUserId)],
+);
+
+/** Vai của đối tác: nha_cung_cap | nguoi_mua | ngan_hang | hang_tau | giam_dinh | kho */
+export const partnerRoles = pgTable(
+  'partner_roles',
+  {
+    partnerId: uuid('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    role: text('role').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.partnerId, t.role] })],
+);
+
+export const partnerContacts = pgTable('partner_contacts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  partnerId: uuid('partner_id')
+    .notNull()
+    .references(() => partners.id),
+  name: text('name').notNull(),
+  position: text('position'),
+  email: text('email'),
+  phone: text('phone'),
+  isPrimary: boolean('is_primary').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Tài liệu pháp lý và chứng nhận có hạn dùng (đăng ký kinh doanh, HACCP, mã vùng trồng, mã FDA/GACC...). */
+export const partnerDocuments = pgTable(
+  'partner_documents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    partnerId: uuid('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    docType: text('doc_type').notNull(),
+    number: text('number'),
+    issuer: text('issuer'),
+    issuedOn: text('issued_on'),
+    /** Ngày hết hạn (YYYY-MM-DD); để trống nếu không có hạn */
+    expiresOn: text('expires_on'),
+    note: text('note'),
+    /** Huỷ thay vì xoá: giữ lý do và người huỷ */
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+    createdBy: uuid('created_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('partner_documents_partner_idx').on(t.partnerId)],
+);
+
+/** Kho, xưởng sơ chế: đi thuê, của nhà cung cấp, hoặc tự đầu tư vận hành. */
+export const facilities = pgTable('facilities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  /** kho | xuong_so_che */
+  kind: text('kind').notNull(),
+  /** thue | cua_nha_cung_cap | tu_van_hanh */
+  ownership: text('ownership').notNull(),
+  /** Đối tác sở hữu (khi thuê hoặc của nhà cung cấp) */
+  partnerId: uuid('partner_id').references(() => partners.id),
+  address: text('address'),
+  capacityKg: bigint('capacity_kg', { mode: 'number' }),
+  certifications: text('certifications'),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type Partner = typeof partners.$inferSelect;

@@ -15,8 +15,11 @@ describe('Mật khẩu', () => {
     expect(checkPasswordPolicy('CaPheGiaVi2026', 'gd@vanthuan.vn')).toBeNull();
   });
 
-  it('mật khẩu tạm đủ mạnh', () => {
-    const p = generateTemporaryPassword();
-    expect(checkPasswordPolicy(p, 'x@y.vn')).toBeNull();
+  it('mật khẩu tạm luôn đủ mạnh', () => {
+    for (let i = 0; i < 500; i++) expect(checkPasswordPolicy(generateTemporaryPassword(), 'x@y.vn')).toBeNull();
+  });
+
+  it('tên đăng nhập quá ngắn thì không xét trùng', () => {
+    expect(checkPasswordPolicy('xanhlam2026a', 'x@y.vn')).toBeNull();
   });
 });

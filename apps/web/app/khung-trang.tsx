@@ -17,6 +17,8 @@ export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactN
       <header className="thanh-tren">
         <nav>
           <Link href="/"><strong>Vạn Thuận ERP</strong></Link>
+          {coQuyen('DOI_TAC_XEM') && <Link href="/doi-tac">Đối tác</Link>}
+          {coQuyen('DOI_TAC_XEM') && <Link href="/danh-muc">Danh mục</Link>}
           {coQuyen('TAI_KHOAN_QUAN_LY') && <Link href="/quan-tri/nguoi-dung">Tài khoản</Link>}
           {coQuyen('NHAT_KY_XEM') && <Link href="/nhat-ky">Nhật ký</Link>}
         </nav>

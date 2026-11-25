@@ -56,3 +56,10 @@ th { color: var(--chu-phu); font-weight: 600; }
 .chon-vai-tro label { font-weight: 400; display: flex; gap: 8px; align-items: center; margin: 4px 0; }
 .chon-vai-tro input { width: auto; }
 code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--nen); padding: 2px 6px; border-radius: 4px; word-break: break-all; }
+.hang { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+.hang > * { flex: 1 1 180px; }
+.hang > button { flex: 0 0 auto; }
+.kyc-dat { color: var(--chinh); font-weight: 600; }
+.kyc-canh-bao { color: var(--loi); font-weight: 600; }
+textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--vien); border-radius: 8px; background: var(--the); color: var(--chu); font: inherit; min-height: 70px; }
+.huy { opacity: 0.55; text-decoration: line-through; }

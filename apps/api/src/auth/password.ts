@@ -19,7 +19,9 @@ export function checkPasswordPolicy(plain: string, email: string): string | null
   if (plain.length < 10) return 'Mật khẩu phải có ít nhất 10 ký tự';
   if (plain.length > 128) return 'Mật khẩu quá dài (tối đa 128 ký tự)';
   if (!/[A-Za-z]/.test(plain) || !/\d/.test(plain)) return 'Mật khẩu phải có cả chữ và số';
-  if (plain.toLowerCase().includes(email.split('@')[0].toLowerCase())) return 'Mật khẩu không được chứa tên đăng nhập';
+  const localPart = email.split('@')[0].toLowerCase();
+  // Chỉ xét khi tên đăng nhập đủ dài; tên 1–3 ký tự thì trùng ngẫu nhiên là chuyện bình thường.
+  if (localPart.length >= 4 && plain.toLowerCase().includes(localPart)) return 'Mật khẩu không được chứa tên đăng nhập';
   return null;
 }
 

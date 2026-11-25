@@ -67,8 +67,17 @@ export const PERMISSIONS = [
   'KE_TOAN_XUAT_MISA',
   // Đối tác
   'DOI_TAC_XEM',
+  /** Tạo, sửa đối tác do mình phụ trách */
   'DOI_TAC_QUAN_LY',
+  /** Sửa mọi đối tác, đổi người phụ trách */
+  'DOI_TAC_QUAN_LY_TAT_CA',
+  /** Duyệt thẩm định đối tác rủi ro thấp và trung bình */
+  'DOI_TAC_DUYET',
+  /** Duyệt thẩm định đối tác rủi ro cao */
+  'DOI_TAC_DUYET_RUI_RO_CAO',
   'DOI_TAC_MOI_CONG',
+  // Danh mục
+  'DANH_MUC_QUAN_LY',
   // Quản trị
   'NHAT_KY_XEM',
   'TAI_KHOAN_QUAN_LY',
@@ -84,6 +93,9 @@ const BAN_GIAM_DOC: Permission[] = [
   'PHI_XEM_TAT_CA',
   'PHI_DUYET_TY_LE',
   'DOI_TAC_XEM',
+  'DOI_TAC_DUYET',
+  'DOI_TAC_DUYET_RUI_RO_CAO',
+  'DANH_MUC_QUAN_LY',
   'NHAT_KY_XEM',
 ];
 
@@ -114,6 +126,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'PHI_XEM_TAT_CA',
     'DOI_TAC_XEM',
     'DOI_TAC_QUAN_LY',
+    'DOI_TAC_QUAN_LY_TAT_CA',
+    'DOI_TAC_DUYET',
+    'DANH_MUC_QUAN_LY',
   ],
   NHAN_VIEN_KD: [
     'HOP_DONG_SOAN_CUA_MINH',
