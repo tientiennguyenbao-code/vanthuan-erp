@@ -13,6 +13,7 @@ import {
   uniqueIndex,
   uuid,
   bigint,
+  numeric,
 } from 'drizzle-orm/pg-core';
 
 /** Tài khoản người dùng (nhân viên nội bộ và đối tác trên cổng). */
@@ -225,3 +226,144 @@ export const facilities = pgTable('facilities', {
 });
 
 export type Partner = typeof partners.$inferSelect;
+
+// ============ Hợp đồng ============
+
+/**
+ * Văn bản ủy quyền ký hợp đồng Giám đốc cấp cho Phó Giám đốc: có thời hạn và hạn mức (USD).
+ * Không xoá; thu hồi thì ghi người, lúc và lý do.
+ */
+export const signAuthorizations = pgTable(
+  'sign_authorizations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    granteeUserId: uuid('grantee_user_id')
+      .notNull()
+      .references(() => users.id),
+    grantedBy: uuid('granted_by')
+      .notNull()
+      .references(() => users.id),
+    /** Số văn bản ủy quyền */
+    documentRef: text('document_ref').notNull(),
+    validFrom: timestamp('valid_from', { withTimezone: true }).notNull(),
+    validTo: timestamp('valid_to', { withTimezone: true }).notNull(),
+    /** Hạn mức giá trị một hợp đồng (USD); để trống là không giới hạn */
+    maxValueUsd: numeric('max_value_usd', { precision: 18, scale: 2, mode: 'number' }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedBy: uuid('revoked_by').references(() => users.id),
+    revokeReason: text('revoke_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('sign_authorizations_grantee_idx').on(t.granteeUserId)],
+);
+
+/**
+ * Hợp đồng. Chỉ các cột cần để tìm kiếm, lọc nằm ở dạng thường; điều khoản (số lượng, giá, thanh toán...)
+ * mã hoá theo từng phiên bản bằng khoá riêng của hợp đồng (dataKeyEnc), khoá này lại được khoá bằng APP_KEY.
+ */
+export const contracts = pgTable(
+  'contracts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    /** mua | ban | moi_gioi | mua_ban_truc_tiep */
+    kind: text('kind').notNull(),
+    /** mua_dut | moi_gioi */
+    dealType: text('deal_type').notNull(),
+    /** Bên bán; để trống nghĩa là Vạn Thuận */
+    sellerPartnerId: uuid('seller_partner_id').references(() => partners.id),
+    /** Bên mua; để trống nghĩa là Vạn Thuận (hoặc chưa có, với hợp đồng môi giới) */
+    buyerPartnerId: uuid('buyer_partner_id').references(() => partners.id),
+    commodityId: uuid('commodity_id')
+      .notNull()
+      .references(() => commodities.id),
+    /** nhap | cho_ky | da_ky | da_huy */
+    status: text('status').notNull().default('nhap'),
+    currentVersion: integer('current_version').notNull().default(1),
+    /** Phiên bản đã ký gần nhất (đang có hiệu lực) */
+    signedVersion: integer('signed_version'),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id),
+    dataKeyEnc: text('data_key_enc').notNull(),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('contracts_code_uq').on(t.code),
+    index('contracts_owner_idx').on(t.ownerUserId),
+    index('contracts_seller_idx').on(t.sellerPartnerId),
+    index('contracts_buyer_idx').on(t.buyerPartnerId),
+  ],
+);
+
+/** Phiên bản 1 là hợp đồng gốc; từ phiên bản 2 là phụ lục. Nội dung đã khoá khi trình ký. */
+export const contractVersions = pgTable(
+  'contract_versions',
+  {
+    contractId: uuid('contract_id')
+      .notNull()
+      .references(() => contracts.id),
+    version: integer('version').notNull(),
+    contentEnc: text('content_enc').notNull(),
+    contentHash: text('content_hash').notNull(),
+    /** Lý do lập phụ lục */
+    reason: text('reason'),
+    submittedBy: uuid('submitted_by').references(() => users.id),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    signedBy: uuid('signed_by').references(() => users.id),
+    signedAt: timestamp('signed_at', { withTimezone: true }),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.contractId, t.version] }), index('contract_versions_hash_idx').on(t.contentHash)],
+);
+
+/**
+ * Sổ cái hợp đồng: chỉ ghi thêm, nối chuỗi bằng mã băm. Mỗi dòng mang mã băm nội dung của đúng phiên bản
+ * và (khi ký) chữ ký lên mã băm đó. Các dòng được gom định kỳ thành cây Merkle để neo ra ngoài.
+ */
+export const contractLedger = pgTable(
+  'contract_ledger',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull(),
+    contractId: uuid('contract_id')
+      .notNull()
+      .references(() => contracts.id),
+    version: integer('version').notNull(),
+    event: text('event').notNull(),
+    actorUserId: uuid('actor_user_id')
+      .notNull()
+      .references(() => users.id),
+    contentHash: text('content_hash').notNull(),
+    /** Chữ ký: { provider, value } */
+    signature: jsonb('signature'),
+    note: text('note'),
+    prevHash: text('prev_hash').notNull(),
+    hash: text('hash').notNull(),
+  },
+  (t) => [index('contract_ledger_contract_idx').on(t.contractId), index('contract_ledger_content_idx').on(t.contentHash)],
+);
+
+/** Đợt neo: gom các dòng sổ cái từ fromId đến toId thành một mã gốc Merkle. Chỉ ghi thêm. */
+export const anchorBatches = pgTable('anchor_batches', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  fromLedgerId: bigint('from_ledger_id', { mode: 'number' }).notNull(),
+  toLedgerId: bigint('to_ledger_id', { mode: 'number' }).notNull(),
+  leafCount: integer('leaf_count').notNull(),
+  merkleRoot: text('merkle_root').notNull(),
+  /** noi_bo | polygon | opentimestamps ... */
+  provider: text('provider').notNull(),
+  txRef: text('tx_ref'),
+});
+
+export type Contract = typeof contracts.$inferSelect;
+export type LedgerEntry = typeof contractLedger.$inferSelect;
