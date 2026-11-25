@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { api } from './api';
 import { TRANG_THAI_HOP_DONG } from './nhan';
 
 export interface DieuKhoan {
@@ -41,7 +43,7 @@ function so(v: string): number {
 }
 
 /** Ô nhập điều khoản dùng chung cho soạn mới, sửa và lập phụ lục. */
-export function NhapDieuKhoan({ v, doi }: { v: DieuKhoan; doi: (v: DieuKhoan) => void }) {
+export function NhapDieuKhoan({ v, doi, matHangId, coPhi = true }: { v: DieuKhoan; doi: (v: DieuKhoan) => void; matHangId?: string; coPhi?: boolean }) {
   const set = <K extends keyof DieuKhoan>(k: K, val: DieuKhoan[K]) => doi({ ...v, [k]: val });
   return (
     <>
@@ -72,8 +74,9 @@ export function NhapDieuKhoan({ v, doi }: { v: DieuKhoan; doi: (v: DieuKhoan) =>
       <div className="hang">
         <div><label htmlFor="cd">Cảng đi</label><input id="cd" value={v.cangDi ?? ''} onChange={(e) => set('cangDi', e.target.value || null)} /></div>
         <div><label htmlFor="cden">Cảng đến</label><input id="cden" value={v.cangDen ?? ''} onChange={(e) => set('cangDen', e.target.value || null)} /></div>
-        <div><label htmlFor="phi">Phí trọn gói (%)</label><input id="phi" inputMode="decimal" value={v.tyLePhiPhanTram ?? ''} onChange={(e) => set('tyLePhiPhanTram', e.target.value ? so(e.target.value) : null)} /></div>
+        {coPhi && <div><label htmlFor="phi">Phí trọn gói (%)</label><input id="phi" inputMode="decimal" value={v.tyLePhiPhanTram ?? ''} onChange={(e) => set('tyLePhiPhanTram', e.target.value ? so(e.target.value) : null)} /></div>}
       </div>
+      {coPhi && <GoiYPhi matHangId={matHangId} tyLe={v.tyLePhiPhanTram} />}
       <label htmlFor="lg">Lịch giao hàng</label>
       <input id="lg" value={v.lichGiao} onChange={(e) => set('lichGiao', e.target.value)} placeholder="VD: Giao trước 15/01/2027 tại kho Buôn Ma Thuột" />
       <label htmlFor="tToan">Điều khoản thanh toán</label>
@@ -87,4 +90,32 @@ export function NhapDieuKhoan({ v, doi }: { v: DieuKhoan; doi: (v: DieuKhoan) =>
 export function NhanTrangThai({ s }: { s: string }) {
   const cls = s === 'da_ky' ? 'kyc-dat' : s === 'da_huy' ? 'kyc-canh-bao' : '';
   return <span className={cls}>{TRANG_THAI_HOP_DONG[s] ?? s}</span>;
+}
+
+interface ThongKePhi {
+  soHopDong: number;
+  trungBinh: number | null;
+  trungVi: number | null;
+  thapNhat: number | null;
+  caoNhat: number | null;
+  san: number | null;
+}
+
+/** Gợi ý tỷ lệ phí từ các hợp đồng đã ký (cùng mặt hàng) và nhắc mức sàn. */
+export function GoiYPhi({ matHangId, tyLe }: { matHangId?: string; tyLe: number | null }) {
+  const [tk, setTk] = useState<ThongKePhi | null>(null);
+  useEffect(() => {
+    api<ThongKePhi>(`/phi/goi-y${matHangId ? `?matHangId=${matHangId}` : ''}`).then(setTk).catch(() => setTk(null));
+  }, [matHangId]);
+  if (!tk) return null;
+  const duoiSan = tk.san !== null && tyLe !== null && tyLe < tk.san;
+  return (
+    <div className="phu" style={{ marginTop: 6 }}>
+      {tk.soHopDong > 0
+        ? <>Tham khảo {tk.soHopDong} hợp đồng đã ký{matHangId ? ' cùng mặt hàng' : ''}: phổ biến {tk.trungVi}%, trung bình {tk.trungBinh}%, từ {tk.thapNhat}% đến {tk.caoNhat}%.</>
+        : <>Chưa có hợp đồng đã ký{matHangId ? ' cùng mặt hàng' : ''} để tham khảo tỷ lệ phí.</>}
+      {tk.san !== null && <> Mức sàn do Ban Giám đốc đặt: {tk.san}%.</>}
+      {duoiSan && <div className="kyc-canh-bao" style={{ marginTop: 4 }}>Tỷ lệ này thấp hơn mức sàn: Ban Giám đốc phải duyệt phí trước khi ký.</div>}
+    </div>
+  );
 }

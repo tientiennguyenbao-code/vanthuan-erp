@@ -43,6 +43,13 @@
       "when": 1795617636206,
       "tag": "0005_bao_gia",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795618237962,
+      "tag": "0006_cau_hinh",
+      "breakpoints": true
     }
   ]
 }

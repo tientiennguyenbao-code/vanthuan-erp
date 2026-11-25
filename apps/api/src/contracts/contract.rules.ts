@@ -17,7 +17,7 @@ export const UNITS = ['kg', 'tan'] as const;
 export type ContractStatus = 'nhap' | 'cho_ky' | 'da_ky' | 'da_huy';
 
 /** Loại sự kiện ghi vào sổ cái hợp đồng. */
-export type LedgerEvent = 'tao' | 'sua' | 'trinh_ky' | 'tra_lai' | 'ky' | 'phu_luc' | 'huy';
+export type LedgerEvent = 'tao' | 'sua' | 'trinh_ky' | 'tra_lai' | 'ky' | 'phu_luc' | 'huy' | 'duyet_phi';
 
 export interface ContractTerms {
   soLuong: number;
@@ -80,9 +80,23 @@ export function contractValueUsd(t: Pick<ContractTerms, 'soLuong' | 'donGia' | '
   return Math.round((v / t.tyGiaUsd) * 100) / 100;
 }
 
+/**
+ * Hợp đồng mang phí trọn gói (bên bán trả): hợp đồng mua khi mua đứt (khấu trừ lúc trả tiền hàng)
+ * và hợp đồng dịch vụ môi giới. Phí phải chốt trước khi ký.
+ */
+export const FEE_BEARING_KINDS: readonly ContractKind[] = ['mua', 'moi_gioi'];
+
+/** Tỷ lệ phí dưới mức sàn Ban Giám đốc đặt thì cần Ban Giám đốc duyệt trước khi ký. */
+export function feeNeedsApproval(ratePct: number | null | undefined, floorPct: number | null | undefined): boolean {
+  return floorPct !== null && floorPct !== undefined && ratePct !== null && ratePct !== undefined && ratePct < floorPct;
+}
+
 /** Điều kiện để trình ký: đủ các điều khoản cốt lõi. Trả về danh sách thiếu sót. */
-export function readinessProblems(t: ContractTerms): string[] {
+export function readinessProblems(t: ContractTerms, kind?: ContractKind): string[] {
   const out: string[] = [];
+  if (kind && FEE_BEARING_KINDS.includes(kind) && (t.tyLePhiPhanTram === null || t.tyLePhiPhanTram === undefined)) {
+    out.push('Chưa chốt tỷ lệ phí trọn gói');
+  }
   if (!(t.soLuong > 0)) out.push('Số lượng phải lớn hơn 0');
   if (!(t.donGia > 0)) out.push('Đơn giá phải lớn hơn 0');
   if (t.tienTe !== 'USD' && !(t.tyGiaUsd && t.tyGiaUsd > 0)) out.push('Hợp đồng không tính bằng USD cần tỷ giá quy đổi (chốt khi ký)');

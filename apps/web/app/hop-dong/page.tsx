@@ -104,6 +104,7 @@ export default function DanhSachHopDong() {
       <p className="phu">
         Mọi lần tạo, sửa, trình ký, ký, phụ lục, huỷ đều được ghi vào sổ cái không sửa được. Chỉ đối tác thẩm định đạt mới chọn được.
         {toi.quyen.includes('HOP_DONG_DUYET_KY') && <> · <Link href="/hop-dong/uy-quyen">Ủy quyền ký</Link></>}
+        {toi.quyen.includes('PHI_DUYET_TY_LE') && <> · <Link href="/hop-dong/muc-san-phi">Mức sàn phí</Link></>}
       </p>
 
       <form className="hang" style={{ marginTop: 16 }} onSubmit={(e) => { e.preventDefault(); tai().catch((er: Error) => setLoi(er.message)); }}>
@@ -154,7 +155,7 @@ export default function DanhSachHopDong() {
             </div>
           </div>
           {(ncc.length === 0 || nguoiMua.length === 0) && <p className="phu">Danh sách chỉ hiện đối tác đã thẩm định đạt và còn hạn.</p>}
-          <NhapDieuKhoan v={dk} doi={setDk} />
+          <NhapDieuKhoan v={dk} doi={setDk} matHangId={form.matHangId || undefined} coPhi={form.loai === 'mua' || form.loai === 'moi_gioi'} />
           <button style={{ marginTop: 16 }}>Tạo bản soạn</button>
         </form>
       )}

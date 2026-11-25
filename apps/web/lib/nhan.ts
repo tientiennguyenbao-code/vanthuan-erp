@@ -60,6 +60,7 @@ export const SU_KIEN_SO_CAI: Record<string, string> = {
   ky: 'Ký',
   phu_luc: 'Lập phụ lục',
   huy: 'Huỷ hợp đồng',
+  duyet_phi: 'Duyệt phí dưới mức sàn',
 };
 
 export function tien(v: number | null | undefined, tienTe?: string): string {

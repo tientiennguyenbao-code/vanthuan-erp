@@ -22,7 +22,7 @@ const termsMua = (over: Record<string, unknown> = {}) => ({
   cangDen: null,
   lichGiao: 'Giao tại kho Buôn Ma Thuột trước 15/01/2027',
   dieuKhoanThanhToan: 'Đặt cọc 30%, phần còn lại khi giao hàng',
-  tyLePhiPhanTram: null,
+  tyLePhiPhanTram: 1.5,
   ghiChu: 'Robusta loại 1, sàng 18',
   ...over,
 });
