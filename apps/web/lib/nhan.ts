@@ -41,3 +41,32 @@ export const HINH_THUC_CO_SO: Record<string, string> = { thue: 'Đi thuê', cua_
 export function ngay(v: string | null | undefined): string {
   return v ? new Date(v).toLocaleDateString('vi-VN') : '—';
 }
+
+export const LOAI_HOP_DONG: Record<string, string> = {
+  mua: 'Hợp đồng mua (Vạn Thuận mua của nhà cung cấp)',
+  ban: 'Hợp đồng bán (Vạn Thuận bán cho người mua)',
+  moi_gioi: 'Hợp đồng dịch vụ môi giới (với bên bán)',
+  mua_ban_truc_tiep: 'Hợp đồng mua bán trực tiếp (nhà cung cấp – người mua)',
+};
+export const LOAI_HOP_DONG_NGAN: Record<string, string> = { mua: 'Mua', ban: 'Bán', moi_gioi: 'Môi giới', mua_ban_truc_tiep: 'Mua bán trực tiếp' };
+
+export const TRANG_THAI_HOP_DONG: Record<string, string> = { nhap: 'Đang soạn', cho_ky: 'Chờ ký', da_ky: 'Đã ký', da_huy: 'Đã huỷ' };
+
+export const SU_KIEN_SO_CAI: Record<string, string> = {
+  tao: 'Tạo hợp đồng',
+  sua: 'Sửa điều khoản',
+  trinh_ky: 'Trình ký',
+  tra_lai: 'Trả lại để sửa',
+  ky: 'Ký',
+  phu_luc: 'Lập phụ lục',
+  huy: 'Huỷ hợp đồng',
+};
+
+export function tien(v: number | null | undefined, tienTe?: string): string {
+  if (v === null || v === undefined) return '—';
+  return `${v.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}${tienTe ? ' ' + tienTe : ''}`;
+}
+
+export function ngayGio(v: string | null | undefined): string {
+  return v ? new Date(v).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+}

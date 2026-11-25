@@ -110,6 +110,22 @@ export class AuthService {
     return { token, stage: next };
   }
 
+  /**
+   * Xác nhận lại bằng mã 2 lớp ngay trước một thao tác quan trọng (ví dụ ký hợp đồng),
+   * để người khác ngồi vào máy đang đăng nhập cũng không ký thay được. Nhập sai tính vào 5 lần khoá.
+   */
+  async confirmStepUp(ctx: AuthContext, code: string, client: ClientInfo): Promise<void> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, ctx.user.id));
+    if (!user?.totpSecretEnc || !user.totpEnabled) throw new BadRequestException('Tài khoản chưa cài đặt xác thực 2 lớp');
+    const step = verifyTotp(decrypt(user.totpSecretEnc, this.key), code.trim());
+    if (step === null || (user.totpLastStep !== null && step <= user.totpLastStep)) {
+      const locked = await this.registerFailure(user, 'xac_nhan_lai', client);
+      if (locked) throw new UnauthorizedException(LOCKED_MESSAGE);
+      throw new UnauthorizedException('Mã xác thực không đúng hoặc đã dùng');
+    }
+    await this.db.update(users).set({ totpLastStep: step, failedAttempts: 0 }).where(eq(users.id, user.id));
+  }
+
   // ---------- Cài đặt 2 lớp lần đầu ----------
 
   async startEnrollment(ctx: AuthContext): Promise<{ secret: string; otpauthUrl: string }> {

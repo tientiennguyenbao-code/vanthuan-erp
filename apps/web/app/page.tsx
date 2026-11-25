@@ -4,7 +4,7 @@ import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from './khung-trang';
 
 const PHAN_HE: { ten: string; moTa: string; quyen: string[]; lienKet?: string; trangThai?: string }[] = [
-  { ten: 'Giao dịch và đối tác', moTa: 'Hồ sơ đối tác, báo giá, hợp đồng, phí trọn gói', quyen: ['HOP_DONG_XEM_TAT_CA', 'HOP_DONG_SOAN_CUA_MINH', 'DOI_TAC_XEM'], lienKet: '/doi-tac', trangThai: 'Đã có: đối tác, thẩm định, danh mục. Đang xây: báo giá, hợp đồng' },
+  { ten: 'Giao dịch và đối tác', moTa: 'Hồ sơ đối tác, báo giá, hợp đồng, phí trọn gói', quyen: ['HOP_DONG_XEM_TAT_CA', 'HOP_DONG_SOAN_CUA_MINH', 'DOI_TAC_XEM'], lienKet: '/hop-dong', trangThai: 'Đã có: đối tác, thẩm định, danh mục, hợp đồng và sổ cái. Đang xây: báo giá, phí trọn gói' },
   { ten: 'Lô hàng', moTa: 'Lô mua, lô xuất, giám định, booking, cảnh báo cut-off', quyen: ['LO_HANG_XEM_TAT_CA', 'LO_HANG_QUAN_LY_CUA_MINH'] },
   { ten: 'Chứng từ', moTa: 'Ma trận 9 cặp, checklist theo lô, duyệt nhiều cấp', quyen: ['CHUNG_TU_XEM_TAT_CA', 'CHUNG_TU_KIEM_TRA'] },
   { ten: 'Phí và kế toán', moTa: 'Đề nghị thu phí, xuất Excel sang MISA AMIS', quyen: ['PHI_XEM_TAT_CA', 'PHI_XEM_CUA_MINH'] },

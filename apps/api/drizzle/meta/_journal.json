@@ -22,6 +22,20 @@
       "when": 1795611897611,
       "tag": "0002_doi_tac_danh_muc",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795616718851,
+      "tag": "0003_hop_dong_so_cai",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795616719539,
+      "tag": "0004_so_cai_chi_ghi_them",
+      "breakpoints": true
     }
   ]
 }

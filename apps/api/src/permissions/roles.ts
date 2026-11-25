@@ -47,7 +47,10 @@ export const PERMISSIONS = [
   'HOP_DONG_XEM_TAT_CA',
   'HOP_DONG_SOAN_TAT_CA',
   'HOP_DONG_SOAN_CUA_MINH',
+  /** Ký hợp đồng, trả lại hợp đồng chưa ký, huỷ hợp đồng đã ký. Phó Giám đốc cần thêm văn bản ủy quyền. */
   'HOP_DONG_DUYET_KY',
+  /** Cấp, thu hồi ủy quyền ký hợp đồng cho Phó Giám đốc */
+  'HOP_DONG_UY_QUYEN',
   // Lô hàng
   'LO_HANG_XEM_TAT_CA',
   'LO_HANG_PHAN_CONG',
@@ -100,9 +103,9 @@ const BAN_GIAM_DOC: Permission[] = [
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  GIAM_DOC: BAN_GIAM_DOC,
-  // Phó Giám đốc ký hợp đồng theo ủy quyền của Giám đốc; việc kiểm tra văn bản ủy quyền
-  // còn hiệu lực sẽ làm trong phân hệ hợp đồng.
+  GIAM_DOC: [...BAN_GIAM_DOC, 'HOP_DONG_UY_QUYEN'],
+  // Phó Giám đốc ký hợp đồng theo ủy quyền của Giám đốc: phân hệ hợp đồng kiểm tra văn bản
+  // ủy quyền còn hiệu lực và hạn mức trước mỗi lần ký.
   PHO_GIAM_DOC: BAN_GIAM_DOC,
   KE_TOAN_TRUONG: [
     'HOP_DONG_XEM_TAT_CA',
