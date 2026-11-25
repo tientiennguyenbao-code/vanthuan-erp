@@ -455,3 +455,182 @@ export const settings = pgTable('settings', {
   updatedBy: uuid('updated_by').references(() => users.id),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ============ Lô hàng ============
+
+/**
+ * Lô mua: hàng của một nhà cung cấp theo một hợp đồng mang phí đã ký (hợp đồng mua với mua đứt,
+ * hợp đồng môi giới với môi giới). Thu gom, sơ chế, nhập kho ghi theo lô mua. Số lượng lưu theo kg.
+ */
+export const purchaseLots = pgTable(
+  'purchase_lots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    /** mua_dut | moi_gioi */
+    dealType: text('deal_type').notNull(),
+    contractId: uuid('contract_id')
+      .notNull()
+      .references(() => contracts.id),
+    supplierPartnerId: uuid('supplier_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    commodityId: uuid('commodity_id')
+      .notNull()
+      .references(() => commodities.id),
+    /** thu_gom | da_so_che | da_nhap_kho | da_huy */
+    status: text('status').notNull().default('thu_gom'),
+    collectedKg: numeric('collected_kg', { precision: 14, scale: 2, mode: 'number' }).notNull().default(0),
+    lossKg: numeric('loss_kg', { precision: 14, scale: 2, mode: 'number' }).notNull().default(0),
+    growingAreaCode: text('growing_area_code'),
+    packingFacilityCode: text('packing_facility_code'),
+    harvestDate: text('harvest_date'),
+    facilityId: uuid('facility_id').references(() => facilities.id),
+    certifications: text('certifications'),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('purchase_lots_code_uq').on(t.code), index('purchase_lots_contract_idx').on(t.contractId)],
+);
+
+/**
+ * Lô xuất: đúng một hợp đồng đối ứng (hợp đồng bán với mua đứt, hợp đồng mua bán trực tiếp với môi giới)
+ * và một booking. Từ đóng gói trở đi, trạng thái và chứng từ tính theo lô xuất.
+ */
+export const exportLots = pgTable(
+  'export_lots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    dealType: text('deal_type').notNull(),
+    counterContractId: uuid('counter_contract_id')
+      .notNull()
+      .references(() => contracts.id),
+    buyerPartnerId: uuid('buyer_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    commodityId: uuid('commodity_id')
+      .notNull()
+      .references(() => commodities.id),
+    /** US | EU | CN */
+    market: text('market').notNull(),
+    /** dong_goi | nhap_kho | giam_dinh | dat_cho | xep_tau | hoan_tat | da_huy */
+    status: text('status').notNull().default('dong_goi'),
+    etd: text('etd'),
+    eta: text('eta'),
+    blNumber: text('bl_number'),
+    shippedOn: text('shipped_on'),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('export_lots_code_uq').on(t.code), uniqueIndex('export_lots_counter_contract_uq').on(t.counterContractId)],
+);
+
+/**
+ * Phân bổ lô mua sang lô xuất (nhiều–nhiều). Cần Trưởng phòng KD duyệt; khi lô mua được chia cho từ hai
+ * lô xuất trở lên thì mọi dòng của lô mua đó cần thêm xác nhận đồng ý của nhà cung cấp.
+ */
+export const lotAllocations = pgTable(
+  'lot_allocations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    purchaseLotId: uuid('purchase_lot_id')
+      .notNull()
+      .references(() => purchaseLots.id),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    approvedBy: uuid('approved_by').references(() => users.id),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('lot_allocations_purchase_idx').on(t.purchaseLotId), index('lot_allocations_export_idx').on(t.exportLotId)],
+);
+
+/** Xác nhận đồng ý chia lô của nhà cung cấp, cho cả lô mua tại một thời điểm; mã băm ghi lên sổ cái hợp đồng. */
+export const splitConsents = pgTable(
+  'split_consents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    purchaseLotId: uuid('purchase_lot_id')
+      .notNull()
+      .references(() => purchaseLots.id),
+    /** Các lô xuất nhà cung cấp đồng ý chia cho (đã sắp xếp) */
+    exportLotIds: jsonb('export_lot_ids').notNull(),
+    documentRef: text('document_ref').notNull(),
+    contentHash: text('content_hash').notNull(),
+    recordedBy: uuid('recorded_by')
+      .notNull()
+      .references(() => users.id),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('split_consents_purchase_idx').on(t.purchaseLotId)],
+);
+
+/** Booking: một lô xuất một booking, nhiều container. */
+export const bookings = pgTable('bookings', {
+  exportLotId: uuid('export_lot_id')
+    .primaryKey()
+    .references(() => exportLots.id),
+  carrier: text('carrier').notNull(),
+  bookingNumber: text('booking_number').notNull(),
+  vesselVoyage: text('vessel_voyage'),
+  cutoffSi: timestamp('cutoff_si', { withTimezone: true }),
+  cutoffVgm: timestamp('cutoff_vgm', { withTimezone: true }),
+  cutoffCargo: timestamp('cutoff_cargo', { withTimezone: true }),
+  /** [{ so: 'MSKU1234567', chi: 'ML-123456' }] */
+  containers: jsonb('containers').notNull().default([]),
+  updatedBy: uuid('updated_by')
+    .notNull()
+    .references(() => users.id),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Nhật ký lô (chỉ ghi thêm): sự kiện hiện trường (thu gom, sơ chế, nhập kho, giám định, đóng cont)
+ * và mọi lần chuyển trạng thái, phân bổ, booking.
+ */
+export const lotEvents = pgTable(
+  'lot_events',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    purchaseLotId: uuid('purchase_lot_id').references(() => purchaseLots.id),
+    exportLotId: uuid('export_lot_id').references(() => exportLots.id),
+    kind: text('kind').notNull(),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }),
+    facilityId: uuid('facility_id').references(() => facilities.id),
+    /** Kết quả giám định: dat | khong_dat */
+    result: text('result'),
+    note: text('note'),
+    detail: jsonb('detail'),
+    actorUserId: uuid('actor_user_id')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [index('lot_events_purchase_idx').on(t.purchaseLotId), index('lot_events_export_idx').on(t.exportLotId)],
+);
+
+export type PurchaseLot = typeof purchaseLots.$inferSelect;
+export type ExportLot = typeof exportLots.$inferSelect;
+export type LotAllocation = typeof lotAllocations.$inferSelect;

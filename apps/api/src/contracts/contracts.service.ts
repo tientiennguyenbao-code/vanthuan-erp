@@ -354,6 +354,23 @@ export class ContractsService {
     return !!row;
   }
 
+  /**
+   * Dùng nội bộ cho phân hệ lô hàng: hợp đồng kèm điều khoản của bản đã ký đang hiệu lực.
+   * Không kiểm quyền xem; nơi gọi tự kiểm quyền của mình.
+   */
+  async signedTerms(id: string, exec: DbExecutor = this.db): Promise<{ contract: Contract; terms: ContractTerms } | null> {
+    const [c] = await exec.select().from(contracts).where(eq(contracts.id, id));
+    if (!c || c.signedVersion === null || c.status === 'da_huy') return null;
+    const [v] = await exec.select().from(contractVersions).where(and(eq(contractVersions.contractId, id), eq(contractVersions.version, c.signedVersion)));
+    return { contract: c, terms: this.readTerms(v.contentEnc, this.dataKey(c)) };
+  }
+
+  /** Ghi một sự kiện ngoài vòng đời hợp đồng (ví dụ nhà cung cấp đồng ý chia lô) vào sổ cái của hợp đồng. */
+  async appendLedgerEvent(contractId: string, event: 'ncc_dong_y_chia_lo', contentHash: string, note: string, ctx: AuthContext, tx: DbExecutor) {
+    const c = await this.findContract(contractId, tx);
+    await this.ledger.append({ contractId, version: c.signedVersion ?? c.currentVersion, event, actorUserId: ctx.user.id, contentHash, note }, tx);
+  }
+
   /** Người ký trả lại để sửa, kèm lý do. */
   async returnForEdit(id: string, reason: string, ctx: AuthContext) {
     await this.db.transaction(async (tx) => {

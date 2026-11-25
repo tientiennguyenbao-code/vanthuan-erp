@@ -9,6 +9,7 @@
   --loi: #b3261e;
   --loi-nen: #fdecea;
   --dat-nen: #e8f4ec;
+  --vang: #b26b00;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -22,6 +23,7 @@
     --loi: #f2948c;
     --loi-nen: #3a1f1d;
     --dat-nen: #1d3127;
+    --vang: #f0b44c;
   }
 }
 * { box-sizing: border-box; }
@@ -66,3 +68,12 @@ textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--vien); borde
 .bang-gon { min-width: 0; }
 .bang-gon td, .bang-gon th { padding: 4px 0; }
 .o-tien { min-width: 90px; }
+
+.den { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }
+.den-do { background: var(--loi); }
+.den-vang { background: var(--vang); }
+.den-xanh { background: var(--chinh); }
+.buoc { display: flex; gap: 4px; flex-wrap: wrap; margin: 12px 0; padding: 0; list-style: none; }
+.buoc li { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--vien); font-size: 13px; color: var(--chu-phu); }
+.buoc li.xong { border-color: var(--chinh); color: var(--chinh); }
+.buoc li.hien-tai { background: var(--chinh); border-color: var(--chinh); color: var(--the); font-weight: 600; }
