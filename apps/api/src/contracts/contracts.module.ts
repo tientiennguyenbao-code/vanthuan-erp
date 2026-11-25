@@ -15,5 +15,6 @@ import { ANCHOR_PROVIDER, InternalAnchorProvider, InternalSignatureProvider, SIG
     { provide: SIGNATURE_PROVIDER, useClass: InternalSignatureProvider },
     { provide: ANCHOR_PROVIDER, useClass: InternalAnchorProvider },
   ],
+  exports: [ContractsService],
 })
 export class ContractsModule {}

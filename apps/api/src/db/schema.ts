@@ -367,3 +367,81 @@ export const anchorBatches = pgTable('anchor_batches', {
 
 export type Contract = typeof contracts.$inferSelect;
 export type LedgerEntry = typeof contractLedger.$inferSelect;
+
+// ============ Báo giá ============
+
+/**
+ * Báo giá mua (từ nhà cung cấp) và báo giá bán (cho người mua).
+ * Báo giá bán lập từ một báo giá mua được chọn, cộng các dòng chi phí theo Incoterms.
+ */
+export const quotes = pgTable(
+  'quotes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    /** mua | ban */
+    kind: text('kind').notNull(),
+    partnerId: uuid('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    commodityId: uuid('commodity_id')
+      .notNull()
+      .references(() => commodities.id),
+    /** Báo giá mua làm nguồn (chỉ với báo giá bán) */
+    sourceQuoteId: uuid('source_quote_id'),
+    /** nhap | da_gui | chap_nhan | tu_choi | huy */
+    status: text('status').notNull().default('nhap'),
+    version: integer('version').notNull().default(1),
+    quantity: numeric('quantity', { precision: 18, scale: 3, mode: 'number' }).notNull(),
+    /** kg | tan */
+    unit: text('unit').notNull(),
+    unitPrice: numeric('unit_price', { precision: 18, scale: 4, mode: 'number' }).notNull(),
+    currency: text('currency').notNull(),
+    /** Số đơn vị tiền đổi được 1 USD (để so sánh và tính biên) */
+    fxPerUsd: numeric('fx_per_usd', { precision: 18, scale: 4, mode: 'number' }),
+    incoterms: text('incoterms').notNull(),
+    portFrom: text('port_from'),
+    portTo: text('port_to'),
+    /** Ngày hết hiệu lực (YYYY-MM-DD) */
+    validUntil: text('valid_until').notNull(),
+    spec: text('spec'),
+    certifications: text('certifications'),
+    deliveryTime: text('delivery_time'),
+    paymentTerms: text('payment_terms'),
+    /** Tỷ lệ phí trọn gói (%) dự kiến (báo giá bán) */
+    feeRatePct: numeric('fee_rate_pct', { precision: 6, scale: 3, mode: 'number' }),
+    note: text('note'),
+    rejectReason: text('reject_reason'),
+    /** Các hợp đồng nháp sinh ra khi chấp nhận */
+    contractIds: jsonb('contract_ids').notNull().default([]),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('quotes_code_uq').on(t.code), index('quotes_commodity_idx').on(t.commodityId, t.kind), index('quotes_owner_idx').on(t.ownerUserId)],
+);
+
+/** Dòng chi phí của báo giá bán: vận tải nội địa, thủ tục xuất khẩu, xếp hàng, cước biển, bảo hiểm... */
+export const quoteCostLines = pgTable(
+  'quote_cost_lines',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    quoteId: uuid('quote_id')
+      .notNull()
+      .references(() => quotes.id),
+    kind: text('kind').notNull(),
+    description: text('description'),
+    amount: numeric('amount', { precision: 18, scale: 2, mode: 'number' }).notNull(),
+    currency: text('currency').notNull(),
+    fxPerUsd: numeric('fx_per_usd', { precision: 18, scale: 4, mode: 'number' }),
+  },
+  (t) => [index('quote_cost_lines_quote_idx').on(t.quoteId)],
+);
+
+export type Quote = typeof quotes.$inferSelect;
+export type QuoteCostLine = typeof quoteCostLines.$inferSelect;

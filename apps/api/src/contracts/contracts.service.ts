@@ -181,13 +181,14 @@ export class ContractsService {
 
   // ---------- Soạn ----------
 
-  async create(input: CreateContractInput, ctx: AuthContext) {
+  /** Tạo bản soạn. Truyền `outerTx` để tạo cùng giao dịch với thao tác khác (ví dụ chấp nhận báo giá). */
+  async create(input: CreateContractInput, ctx: AuthContext, outerTx?: DbExecutor) {
     this.assertCanDraft(ctx);
     const problem = checkParties(input.kind, input.sellerPartnerId, input.buyerPartnerId);
     if (problem) throw new BadRequestException(problem);
     const ownerUserId = this.canDraftAll(ctx) ? (input.ownerUserId ?? ctx.user.id) : ctx.user.id;
 
-    return this.db.transaction(async (tx) => {
+    const run = async (tx: DbExecutor) => {
       await this.assertPartiesUsable(input.kind, input.sellerPartnerId ?? null, input.buyerPartnerId ?? null, tx);
       const [com] = await tx.select().from(commodities).where(eq(commodities.id, input.commodityId));
       if (!com || !com.active) throw new BadRequestException('Mặt hàng không có hoặc đã ngừng');
@@ -212,7 +213,8 @@ export class ContractsService {
       await tx.insert(contractVersions).values({ contractId: c.id, version: 1, contentEnc: encrypt(stableStringify(input.terms), dataKey), contentHash, createdBy: ctx.user.id });
       await this.ledger.append({ contractId: c.id, version: 1, event: 'tao', actorUserId: ctx.user.id, contentHash }, tx);
       return { id: c.id, code };
-    });
+    };
+    return outerTx ? run(outerTx) : this.db.transaction(run);
   }
 
   /** Sửa điều khoản khi đang soạn. Mỗi lần lưu là một dòng sổ cái với mã băm mới. */

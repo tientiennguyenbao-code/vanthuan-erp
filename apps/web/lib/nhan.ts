@@ -70,3 +70,17 @@ export function tien(v: number | null | undefined, tienTe?: string): string {
 export function ngayGio(v: string | null | undefined): string {
   return v ? new Date(v).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 }
+
+export const TRANG_THAI_BAO_GIA: Record<string, string> = { nhap: 'Đang soạn', da_gui: 'Đã gửi', chap_nhan: 'Đã chấp nhận', tu_choi: 'Bị từ chối', huy: 'Đã huỷ' };
+
+export const LOAI_CHI_PHI: Record<string, string> = {
+  van_tai_noi_dia: 'Vận tải nội địa',
+  thu_tuc_xuat_khau: 'Thủ tục xuất khẩu',
+  xep_hang: 'Phí xếp hàng tại cảng đi',
+  cuoc_bien: 'Cước biển',
+  bao_hiem: 'Bảo hiểm hàng hoá (tối thiểu 110% giá trị)',
+  giam_dinh: 'Giám định',
+  so_che_dong_goi: 'Sơ chế, đóng gói',
+  kho: 'Lưu kho',
+  khac: 'Khác',
+};
