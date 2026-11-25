@@ -50,6 +50,20 @@
       "when": 1795618237962,
       "tag": "0006_cau_hinh",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795618777445,
+      "tag": "0007_lo_hang",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795618778253,
+      "tag": "0008_nhat_ky_lo_chi_ghi_them",
+      "breakpoints": true
     }
   ]
 }
