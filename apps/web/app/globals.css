@@ -87,3 +87,18 @@ a.the-lo { display: block; color: inherit; text-decoration: none; }
 a.the-lo:hover { border-color: var(--chinh); }
 .the-ct { background: var(--the); border: 1px solid var(--vien); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
 .the-ct .hang { margin-top: 8px; }
+
+.hinh-thua { width: 100%; height: auto; background: var(--the); border: 1px solid var(--vien); border-radius: 10px; display: block; }
+.thua-ve polygon { fill: var(--chinh); fill-opacity: 0.18; stroke: var(--chinh); stroke-width: 1.5; }
+.thua-ve circle { fill: var(--chinh); stroke: var(--the); stroke-width: 1.5; }
+.thua-canh-bao polygon { fill: var(--vang); stroke: var(--vang); }
+.thua-canh-bao circle { fill: var(--vang); }
+.thua-chon polygon { fill-opacity: 0.4; stroke-width: 3; }
+.thua-chon circle { stroke: var(--chu); stroke-width: 2.5; }
+.thuoc-do line { stroke: var(--chu-phu); stroke-width: 2; }
+.thuoc-do text { fill: var(--chu-phu); font-size: 12px; }
+.so-lon { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.the-thua { background: var(--the); border: 1px solid var(--vien); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+.nut-lon { width: 100%; padding: 14px 16px; font-size: 16px; margin-top: 10px; }
+.canh-bao-nhe { color: var(--vang); font-weight: 600; }
+details.o summary { cursor: pointer; font-weight: 600; }

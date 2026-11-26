@@ -24,7 +24,8 @@ export default function ChiTietDoiTac() {
   const [loi, setLoi] = useState('');
   const [tb, setTb] = useState('');
   const [lh, setLh] = useState({ name: '', position: '', email: '', phone: '' });
-  const [tl, setTl] = useState({ docType: '', number: '', issuer: '', issuedOn: '', expiresOn: '' });
+  const [tl, setTl] = useState({ docType: '', number: '', issuer: '', issuedOn: '', expiresOn: '', growingAreaId: '' });
+  const [vungDs, setVungDs] = useState<{ id: string; code: string; name: string }[]>([]);
   const [tdinh, setTdinh] = useState({ riskRating: 'thap', screeningNote: '' });
   const [lyDoTuChoi, setLyDoTuChoi] = useState('');
 
@@ -32,6 +33,12 @@ export default function ChiTietDoiTac() {
   useEffect(() => {
     if (toi) tai().catch((e: Error) => setLoi(e.message));
   }, [toi, tai]);
+  useEffect(() => {
+    // Vùng trồng của nhà cung cấp, để gắn phạm vi cho chứng nhận (chỉ khi được xem nguồn cung)
+    if (toi?.quyen.includes('NGUON_CUNG_XEM') && p?.roles.includes('nha_cung_cap')) {
+      api<{ vung: { id: string; code: string; name: string }[] }>(`/nguon-cung/${id}`).then((r) => setVungDs(r.vung)).catch(() => setVungDs([]));
+    }
+  }, [toi, p, id]);
 
   async function lam(viec: () => Promise<unknown>, xong: string) {
     setLoi('');
@@ -128,13 +135,16 @@ export default function ChiTietDoiTac() {
         </table>
       </div>
       {suaDuoc && (
-        <form className="o" style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); lam(() => api(`/doi-tac/${id}/tai-lieu`, { body: { docType: tl.docType, number: rong(tl.number), issuer: rong(tl.issuer), issuedOn: rong(tl.issuedOn), expiresOn: rong(tl.expiresOn) } }).then(() => setTl({ docType: '', number: '', issuer: '', issuedOn: '', expiresOn: '' })), 'Đã thêm tài liệu.'); }}>
+        <form className="o" style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); lam(() => api(`/doi-tac/${id}/tai-lieu`, { body: { docType: tl.docType, number: rong(tl.number), issuer: rong(tl.issuer), issuedOn: rong(tl.issuedOn), expiresOn: rong(tl.expiresOn), growingAreaId: tl.growingAreaId || null } }).then(() => setTl({ docType: '', number: '', issuer: '', issuedOn: '', expiresOn: '', growingAreaId: '' })), 'Đã thêm tài liệu.'); }}>
           <div className="hang">
             <div><label htmlFor="lt">Loại tài liệu</label><input id="lt" required list="loai-tl" value={tl.docType} onChange={(e) => setTl({ ...tl, docType: e.target.value })} /></div>
             <div><label htmlFor="so">Số</label><input id="so" value={tl.number} onChange={(e) => setTl({ ...tl, number: e.target.value })} /></div>
             <div><label htmlFor="nc">Nơi cấp</label><input id="nc" value={tl.issuer} onChange={(e) => setTl({ ...tl, issuer: e.target.value })} /></div>
             <div><label htmlFor="ngc">Ngày cấp</label><input id="ngc" type="date" value={tl.issuedOn} onChange={(e) => setTl({ ...tl, issuedOn: e.target.value })} /></div>
             <div><label htmlFor="nhh">Ngày hết hạn</label><input id="nhh" type="date" value={tl.expiresOn} onChange={(e) => setTl({ ...tl, expiresOn: e.target.value })} /></div>
+            {vungDs.length > 0 && (
+              <div><label htmlFor="pv">Phạm vi</label><select id="pv" value={tl.growingAreaId} onChange={(e) => setTl({ ...tl, growingAreaId: e.target.value })}><option value="">Cả nhà cung cấp</option>{vungDs.map((v) => <option key={v.id} value={v.id}>Chỉ vùng {v.code} · {v.name}</option>)}</select></div>
+            )}
             <button>Thêm tài liệu</button>
           </div>
           <datalist id="loai-tl">

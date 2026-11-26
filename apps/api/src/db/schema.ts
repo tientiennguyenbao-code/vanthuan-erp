@@ -14,6 +14,7 @@ import {
   uuid,
   bigint,
   numeric,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 /** Tài khoản người dùng (nhân viên nội bộ và đối tác trên cổng). */
@@ -198,6 +199,8 @@ export const partnerDocuments = pgTable(
     /** Ngày hết hạn (YYYY-MM-DD); để trống nếu không có hạn */
     expiresOn: text('expires_on'),
     note: text('note'),
+    /** Phạm vi chứng nhận: để trống là cả nhà cung cấp, có giá trị là chỉ một vùng trồng / vùng nuôi */
+    growingAreaId: uuid('growing_area_id').references((): AnyPgColumn => growingAreas.id),
     /** Huỷ thay vì xoá: giữ lý do và người huỷ */
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidedBy: uuid('voided_by').references(() => users.id),
@@ -1005,3 +1008,135 @@ export type Financing = typeof financings.$inferSelect;
 export type LotPayment = typeof lotPayments.$inferSelect;
 export type Complaint = typeof complaints.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
+
+// ============ Nguồn cung: nông hộ, vùng trồng, thửa ============
+
+/**
+ * Nông hộ (hoặc chủ ao) thành viên của một nhà cung cấp / HTX. Số CCCD lưu mã hoá; chỉ hiện 4 số cuối,
+ * xem đầy đủ cần quyền riêng và được ghi nhật ký. Phải có ngày hộ ký đồng ý cho xử lý dữ liệu cá nhân.
+ */
+export const farmers = pgTable(
+  'farmers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    supplierPartnerId: uuid('supplier_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    code: text('code').notNull(),
+    fullName: text('full_name').notNull(),
+    idNumberEnc: text('id_number_enc'),
+    /** Mã băm có khoá của số CCCD, để phát hiện một hộ khai ở hai nơi mà không lưu số rõ */
+    idNumberHash: text('id_number_hash'),
+    idNumberLast4: text('id_number_last4'),
+    phone: text('phone'),
+    commune: text('commune'),
+    district: text('district'),
+    province: text('province').notNull(),
+    joinedOn: text('joined_on'),
+    consentOn: text('consent_on').notNull(),
+    /** noi_bo | cong_ncc */
+    source: text('source').notNull(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('farmers_code_uq').on(t.code),
+    index('farmers_supplier_idx').on(t.supplierPartnerId),
+    uniqueIndex('farmers_supplier_id_uq').on(t.supplierPartnerId, t.idNumberHash).where(sql`${t.voidedAt} is null and ${t.idNumberHash} is not null`),
+  ],
+);
+
+/** Vùng trồng hoặc vùng nuôi của một nhà cung cấp; có thể có mã số do cơ quan nhà nước cấp. */
+export const growingAreas = pgTable(
+  'growing_areas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    supplierPartnerId: uuid('supplier_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    /** vung_trong | vung_nuoi */
+    kind: text('kind').notNull(),
+    /** ca_phe | gia_vi | thuy_san */
+    sector: text('sector').notNull(),
+    /** Mã số vùng trồng (Cục BVTV) hoặc mã cơ sở nuôi, nếu đã được cấp */
+    officialCode: text('official_code'),
+    officialCodeIssuer: text('official_code_issuer'),
+    commune: text('commune'),
+    district: text('district'),
+    province: text('province').notNull(),
+    note: text('note'),
+    active: boolean('active').notNull().default(true),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('growing_areas_code_uq').on(t.code), index('growing_areas_supplier_idx').on(t.supplierPartnerId)],
+);
+
+/**
+ * Thửa đất hoặc ao nuôi: thuộc một hộ và một vùng. Tọa độ dạng GeoJSON (WGS84): một điểm nếu ≤ 4 ha,
+ * đa giác nếu lớn hơn (EUDR). Sửa tọa độ được ghi nhật ký kèm tọa độ cũ.
+ */
+export const plots = pgTable(
+  'plots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    supplierPartnerId: uuid('supplier_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    farmerId: uuid('farmer_id')
+      .notNull()
+      .references(() => farmers.id),
+    growingAreaId: uuid('growing_area_id')
+      .notNull()
+      .references(() => growingAreas.id),
+    /** thua | ao */
+    kind: text('kind').notNull(),
+    /** Cây trồng hoặc loài nuôi (Robusta, Arabica, tiêu, tôm thẻ...) */
+    crop: text('crop'),
+    plantedYear: integer('planted_year'),
+    geometry: jsonb('geometry').notNull(),
+    /** diem | da_giac */
+    geometryType: text('geometry_type').notNull(),
+    declaredAreaHa: numeric('declared_area_ha', { precision: 10, scale: 4, mode: 'number' }),
+    measuredAreaHa: numeric('measured_area_ha', { precision: 10, scale: 4, mode: 'number' }),
+    /** Diện tích dùng để tính (đo từ ranh giới nếu có) */
+    areaHa: numeric('area_ha', { precision: 10, scale: 4, mode: 'number' }).notNull(),
+    /** Sai số GPS (m) khi lấy bằng điện thoại */
+    gpsAccuracyM: numeric('gps_accuracy_m', { precision: 8, scale: 1, mode: 'number' }),
+    /** Giấy tờ quyền sử dụng đất / mặt nước: loại và số */
+    landDocType: text('land_doc_type'),
+    landDocNumber: text('land_doc_number'),
+    /** Cảnh báo lúc ghi (chồng lấn thửa khác, diện tích lệch) để nhân viên kiểm tra */
+    warnings: jsonb('warnings').notNull().default([]),
+    /** noi_bo | cong_ncc | nhap_tep */
+    source: text('source').notNull(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('plots_code_uq').on(t.code),
+    index('plots_supplier_idx').on(t.supplierPartnerId),
+    index('plots_farmer_idx').on(t.farmerId),
+    index('plots_area_idx').on(t.growingAreaId),
+  ],
+);
+
+export type Farmer = typeof farmers.$inferSelect;
+export type GrowingArea = typeof growingAreas.$inferSelect;
+export type Plot = typeof plots.$inferSelect;

@@ -44,6 +44,16 @@ describe('Bảng phân quyền', () => {
     expect(permissionsFor(['NHAN_VIEN_KD'])).not.toContain('KHIEU_NAI_GIAI_QUYET');
   });
 
+  it('nguồn cung: thu mua và Trưởng phòng KD lập hồ sơ; chỉ Giám đốc và thu mua xem đủ số CCCD', () => {
+    for (const r of ROLES) {
+      const p = permissionsFor([r]);
+      expect(p.includes('NGUON_CUNG_QUAN_LY')).toBe(r === 'NHAN_VIEN_THU_MUA' || r === 'TRUONG_PHONG_KD');
+      expect(p.includes('NGUON_CUNG_XEM_CCCD')).toBe(r === 'NHAN_VIEN_THU_MUA' || r === 'GIAM_DOC');
+    }
+    expect(permissionsFor(['NHAN_VIEN_THU_MUA'])).not.toContain('HOP_DONG_SOAN_CUA_MINH');
+    expect(requiresTwoFactor(['NHAN_VIEN_THU_MUA'])).toBe(true);
+  });
+
   it('đối tác không có quyền nội bộ nào', () => {
     expect(permissionsFor(['NHA_CUNG_CAP', 'NGUOI_MUA'])).toEqual([]);
   });

@@ -34,6 +34,7 @@ const documentSchema = z.object({
   issuedOn: date.nullish(),
   expiresOn: date.nullish(),
   note: optText(500),
+  growingAreaId: z.uuid().nullish(),
 });
 const voidSchema = z.object({ lyDo: z.string().trim().min(3, 'Ghi lý do huỷ').max(300) });
 const submitSchema = z.object({
