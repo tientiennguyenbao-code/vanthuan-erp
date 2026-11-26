@@ -6,10 +6,14 @@ import { DocRulesController, DocumentsController, FeeRequestsController, FilesCo
 import { DocumentsService } from './documents.service';
 import { AllocationsController, ExportLotsController, PurchaseLotsController } from './lots.controller';
 import { LotsService } from './lots.service';
+import { MisaController } from './misa.controller';
+import { MisaService } from './misa.service';
+import { PartnerPortalAccountsController, PortalController } from './portal.controller';
+import { PortalService } from './portal.service';
 
 @Module({
   imports: [AuditModule, ContractsModule],
-  controllers: [PurchaseLotsController, ExportLotsController, AllocationsController, LotDocumentsController, DocumentsController, DocRulesController, FeeRequestsController, FilesController],
-  providers: [LotsService, DocumentsService, { provide: FILE_STORE, useClass: LocalFileStore }],
+  controllers: [PurchaseLotsController, ExportLotsController, AllocationsController, LotDocumentsController, DocumentsController, DocRulesController, FeeRequestsController, FilesController, PortalController, PartnerPortalAccountsController, MisaController],
+  providers: [LotsService, DocumentsService, PortalService, MisaService, { provide: FILE_STORE, useClass: LocalFileStore }],
 })
 export class LotsModule {}

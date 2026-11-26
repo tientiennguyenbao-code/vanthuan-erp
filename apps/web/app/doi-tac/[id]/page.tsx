@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { DoiTac, NhanKyc } from '@/lib/doi-tac';
 import { NHOM_DOI_TAC, ngay, RUI_RO, VAI_DOI_TAC } from '@/lib/nhan';
 import { useToi } from '@/lib/use-toi';
+import { TaiKhoanCong } from '@/lib/cong';
 import { KhungTrang } from '../../khung-trang';
 
 interface LienHe { id: string; name: string; position: string | null; email: string | null; phone: string | null; isPrimary: boolean }
@@ -139,7 +140,7 @@ export default function ChiTietDoiTac() {
           <datalist id="loai-tl">
             {['Giấy chứng nhận đăng ký doanh nghiệp', 'Giấy chứng nhận đăng ký HTX', 'VietGAP', 'GlobalG.A.P.', 'HACCP', 'ISO 22000', 'Chứng nhận hữu cơ', 'Mã số vùng trồng', 'Mã số cơ sở đóng gói', 'Đăng ký FDA', 'Mã đăng ký GACC', 'Danh sách EU', 'Business licence'].map((x) => <option key={x} value={x} />)}
           </datalist>
-          <p className="phu">Tệp scan đính kèm sẽ có khi hệ thống lưu tệp được dựng (phần chứng từ).</p>
+          <p className="phu">Tệp scan của chứng từ theo lô được tải lên ở checklist chứng từ của lô.</p>
         </form>
       )}
 
@@ -165,6 +166,13 @@ export default function ChiTietDoiTac() {
             <button>Thêm</button>
           </div>
         </form>
+      )}
+
+      {suaDuoc && p.kycStatus === 'dat' && p.roles.includes('nha_cung_cap') && (
+        <>
+          <h2>Tài khoản cổng nhà cung cấp</h2>
+          <TaiKhoanCong doiTacId={p.id} />
+        </>
       )}
     </KhungTrang>
   );

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { kg } from '@/lib/lo-hang';
+import { XuatMisa } from '@/lib/misa';
 import { ngay, tien } from '@/lib/nhan';
 import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from '../../khung-trang';
@@ -29,6 +30,7 @@ interface DeNghi {
   blDate: string;
   status: string;
   approvedByName: string | null;
+  misaExportCode: string | null;
   coTheDuyet: boolean;
 }
 
@@ -86,6 +88,7 @@ function DeNghiThuPhi() {
           </select>
         </div>
       </div>
+      {toi.quyen.includes('KE_TOAN_XUAT_MISA') && <XuatMisa sauKhiXuat={() => tai().catch((e: Error) => setLoi(e.message))} />}
       {thongBao && <div className="dat" role="status">{thongBao}</div>}
       {loi && <div className="loi" role="alert">{loi}</div>}
       <div className="bang-cuon" style={{ marginTop: 16 }}>
@@ -104,6 +107,7 @@ function DeNghiThuPhi() {
                 <td className={d.status === 'thieu_ty_le' ? 'kyc-canh-bao' : d.status === 'da_duyet' ? 'kyc-dat' : ''}>
                   {TRANG_THAI[d.status] ?? d.status}
                   {d.approvedByName && <div className="phu">{d.approvedByName}</div>}
+                  {d.misaExportCode && <div className="phu">Đã chuyển kế toán ({d.misaExportCode})</div>}
                 </td>
                 <td>{d.coTheDuyet && <button className="nho" onClick={() => duyet(d)}>Duyệt</button>}</td>
               </tr>

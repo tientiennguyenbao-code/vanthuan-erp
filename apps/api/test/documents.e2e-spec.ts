@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import ExcelJS from 'exceljs';
 import { Pool } from 'pg';
 import { PG_POOL } from '../src/db/db';
 import { codeFor, createUser, fullFirstLogin, startApp } from './helpers';
@@ -218,6 +219,58 @@ describe('Chứng từ: checklist theo thị trường, cổng xếp tàu, đề
     await ktt.post(`/api/de-nghi-thu-phi/${f1}/duyet`).expect(204);
     await ktt.post(`/api/de-nghi-thu-phi/${f1}/duyet`).expect(400);
     await qt.get('/api/de-nghi-thu-phi').expect(403);
+  });
+
+  it('Kế toán xuất đề nghị đã duyệt sang Excel MISA; mỗi đề nghị chỉ xuất một lần', async () => {
+    const binary = (res: unknown, cb: (e: Error | null, b: Buffer) => void) => {
+      const s = res as NodeJS.ReadableStream;
+      const chunks: Buffer[] = [];
+      s.on('data', (c: Buffer) => chunks.push(c));
+      s.on('end', () => cb(null, Buffer.concat(chunks)));
+    };
+    const sheet = async (buf: Buffer) => {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ArrayBuffer);
+      const ws = wb.getWorksheet('Ban dich vu')!;
+      const head = (ws.getRow(1).values as unknown[]).slice(1) as string[];
+      const rows: Record<string, unknown>[] = [];
+      ws.eachRow((r, i) => {
+        if (i > 1) rows.push(Object.fromEntries(head.map((h, j) => [h, r.getCell(j + 1).value])));
+      });
+      return rows;
+    };
+    await nv.get('/api/xuat-misa').expect(403);
+    await tp.post('/api/xuat-misa/phi-tron-goi').expect(403);
+    const before = (await ktt.get('/api/xuat-misa').expect(200)).body;
+    expect(before.choXuat).toBeGreaterThanOrEqual(1);
+
+    const ex = await ktt.post('/api/xuat-misa/phi-tron-goi').buffer(true).parse(binary).expect(200);
+    expect(ex.headers['content-type']).toMatch(/spreadsheetml/);
+    const code = ex.headers['x-dot-xuat'] as string;
+    expect(code).toMatch(/^MISA-\d{8}-\d{2}$/);
+    const rows = await sheet(ex.body as Buffer);
+    const mine = rows.filter((r) => String(r['Diễn giải']).includes('CMA-BL-01'));
+    expect(mine).toHaveLength(1); // đề nghị thứ hai chưa duyệt nên chưa xuất
+    expect(mine[0]).toMatchObject({ 'Thành tiền': 720, 'Loại tiền': 'USD', 'TK Nợ (*)': '131', 'TK Có (*)': '5113', 'Tỷ lệ phí (%)': 1.5 });
+
+    await ktt.post('/api/xuat-misa/phi-tron-goi').expect(400);
+    const list = (await ktt.get(`/api/de-nghi-thu-phi?loXuatId=${ids.lx}`).expect(200)).body.deNghi as { purchaseLotId: string; id: string; misaExportCode: string | null }[];
+    expect(list.find((f) => f.purchaseLotId === ids.lm1)!.misaExportCode).toBe(code);
+    expect(list.find((f) => f.purchaseLotId === ids.lm2)!.misaExportCode).toBeNull();
+
+    // Đề nghị duyệt sau vào đợt kế tiếp, không lặp dòng đã xuất
+    await ktt.post(`/api/de-nghi-thu-phi/${list.find((f) => f.purchaseLotId === ids.lm2)!.id}/duyet`).expect(204);
+    const ex2 = await ktt.post('/api/xuat-misa/phi-tron-goi').buffer(true).parse(binary).expect(200);
+    expect(ex2.headers['x-dot-xuat']).not.toBe(code);
+    const rows2 = (await sheet(ex2.body as Buffer)).filter((r) => String(r['Diễn giải']).includes('CMA-BL-01'));
+    expect(rows2).toEqual([expect.objectContaining({ 'Thành tiền': 480, 'Tỷ lệ phí (%)': 2 })]);
+
+    // Tải lại đúng tệp đã xuất
+    const dot = (await ktt.get('/api/xuat-misa').expect(200)).body.dotXuat.find((d: { code: string }) => d.code === code);
+    expect(dot).toMatchObject({ rowCount: rows.length });
+    const again = await ktt.get(`/api/xuat-misa/${dot.id}/tep`).buffer(true).parse(binary).expect(200);
+    expect(Buffer.compare(again.body as Buffer, ex.body as Buffer)).toBe(0);
+    await tp.get(`/api/xuat-misa/${dot.id}/tep`).expect(403);
   });
 
   it('hoàn tất cần mọi chứng từ bắt buộc đã gửi', async () => {

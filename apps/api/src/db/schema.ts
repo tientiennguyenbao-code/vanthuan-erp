@@ -719,6 +719,23 @@ export const lotDocuments = pgTable(
  * Đề nghị thu phí trọn gói, sinh khi lô xuất sang "xếp tàu": mỗi lô mua trong lô một dòng,
  * phí = khối lượng phân bổ × đơn giá hợp đồng đối ứng × tỷ lệ phí của hợp đồng mang phí.
  */
+/** Mỗi lần kế toán xuất tệp Excel sang MISA AMIS: ai, lúc nào, bao nhiêu dòng, mã băm tệp. */
+export const misaExports = pgTable('misa_exports', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  /** phi_tron_goi */
+  kind: text('kind').notNull(),
+  code: text('code').notNull().unique(),
+  rowCount: integer('row_count').notNull(),
+  fileSha256: text('file_sha256').notNull(),
+  /** Tệp đã giao cho kế toán, lưu mã hoá để tải lại đúng bản cũ */
+  storageKey: text('storage_key').notNull(),
+  keyEnc: text('key_enc').notNull(),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const feeRequests = pgTable(
   'fee_requests',
   {
@@ -748,6 +765,8 @@ export const feeRequests = pgTable(
     status: text('status').notNull(),
     approvedBy: uuid('approved_by').references(() => users.id),
     approvedAt: timestamp('approved_at', { withTimezone: true }),
+    /** Đợt xuất sang MISA AMIS (đã chuyển kế toán); để trống nghĩa là chưa xuất */
+    misaExportId: uuid('misa_export_id').references(() => misaExports.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('fee_requests_lot_idx').on(t.exportLotId), uniqueIndex('fee_requests_uq').on(t.exportLotId, t.purchaseLotId)],
@@ -797,6 +816,20 @@ export const documentFiles = pgTable(
   },
   (t) => [uniqueIndex('document_files_version_uq').on(t.lotDocumentId, t.version)],
 );
+
+/** Tài khoản cổng đối tác gắn với đối tác nào (mỗi tài khoản đối tác thuộc đúng một đối tác). */
+export const partnerUsers = pgTable('partner_users', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  partnerId: uuid('partner_id')
+    .notNull()
+    .references(() => partners.id),
+  invitedBy: uuid('invited_by')
+    .notNull()
+    .references(() => users.id),
+  invitedAt: timestamp('invited_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export type DocRule = typeof docRules.$inferSelect;
 export type LotDocument = typeof lotDocuments.$inferSelect;

@@ -83,3 +83,7 @@ button.lien-ket:hover { background: none; color: var(--chinh-dam); }
 .nut-tep { position: relative; }
 .nut-tep input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .nut-tep:focus-within { outline: 2px solid var(--chinh); outline-offset: 2px; }
+a.the-lo { display: block; color: inherit; text-decoration: none; }
+a.the-lo:hover { border-color: var(--chinh); }
+.the-ct { background: var(--the); border: 1px solid var(--vien); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+.the-ct .hang { margin-top: 8px; }

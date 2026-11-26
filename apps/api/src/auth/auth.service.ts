@@ -5,7 +5,7 @@ import { loadConfig } from '../config/config';
 import { decrypt, encrypt, randomToken, sha256Hex } from '../common/crypto';
 import { DB, Db, DbExecutor } from '../db/db';
 import { Session, sessions, User, userRoles, users } from '../db/schema';
-import { isRole, permissionsFor, requiresTwoFactor, Role } from '../permissions/roles';
+import { isRole, PARTNER_ROLES, permissionsFor, requiresTwoFactor, Role } from '../permissions/roles';
 import { checkPasswordPolicy, hashPassword, verifyPassword } from './password';
 import { generateTotpSecret, otpauthUrl, verifyTotp } from './totp';
 import {
@@ -30,6 +30,8 @@ export interface StageResult {
 
 const WRONG_CREDENTIALS = 'Email hoặc mật khẩu không đúng';
 const LOCKED_MESSAGE = 'Tài khoản đang bị khoá do nhập sai quá 5 lần. Liên hệ quản trị hệ thống để mở khoá.';
+const PARTNER_IDLE_DAYS = 90;
+const IDLE_MESSAGE = 'Tài khoản đã bị khoá vì không dùng quá 90 ngày. Liên hệ nhân viên Vạn Thuận phụ trách để mở lại.';
 // Mã băm giả để người dò email không đoán được email nào có thật qua thời gian phản hồi.
 let dummyHash: Promise<string> | undefined;
 
@@ -79,6 +81,14 @@ export class AuthService {
     }
 
     const roles = await this.rolesOf(user.id);
+    // Tài khoản đối tác không dùng 90 ngày thì tự khoá (theo thiết kế cổng đối tác).
+    if (roles.some((r) => PARTNER_ROLES.includes(r)) && Date.now() - (user.lastLoginAt ?? user.createdAt).getTime() > PARTNER_IDLE_DAYS * 864e5) {
+      await this.db.transaction(async (tx) => {
+        await tx.update(users).set({ status: 'bi_khoa', lockedAt: new Date(), updatedAt: new Date() }).where(eq(users.id, user.id));
+        await this.audit.record({ actorUserId: user.id, action: 'tai_khoan.khoa_do_khong_dung', entityType: 'user', entityId: user.id, ip: client.ip, detail: { ngay: PARTNER_IDLE_DAYS } }, tx);
+      });
+      throw new UnauthorizedException(IDLE_MESSAGE);
+    }
     let stage: SessionStage;
     if (user.totpEnabled) stage = 'cho_ma_2_lop';
     else if (requiresTwoFactor(roles)) stage = 'can_cai_2_lop';
