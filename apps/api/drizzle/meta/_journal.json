@@ -155,6 +155,13 @@
       "when": 1795690017052,
       "tag": "0021_doi_chieu_ma_vung",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795690645473,
+      "tag": "0022_thuy_san_khai_thac",
+      "breakpoints": true
     }
   ]
 }

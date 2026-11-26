@@ -12,7 +12,7 @@ export const FACILITY_SCHEME_LABEL: Record<FacilityScheme, string> = {
   eu_list: 'Mã trong danh sách cơ sở được xuất vào EU',
 };
 
-export type CheckKey = 'truy_nguon' | 'eudr' | 'thuoc_bvtv' | 'ma_so_vung' | 'simp' | FacilityScheme;
+export type CheckKey = 'truy_nguon' | 'eudr' | 'thuoc_bvtv' | 'ma_so_vung' | 'iuu' | 'simp' | FacilityScheme;
 
 export interface MarketRule {
   /** Mức truy xuất tối thiểu, như bảng trong thiết kế */
@@ -32,7 +32,7 @@ export const TRACE_RULES: Record<string, Record<string, MarketRule>> = {
     CN: { muc: 'Vùng trồng và cơ sở', kiem: ['gacc', 'ma_so_vung'] },
   },
   thuy_san: {
-    EU: { muc: 'Ao nuôi hoặc tàu khai thác', kiem: ['truy_nguon', 'ma_so_vung', 'eu_list'] },
+    EU: { muc: 'Ao nuôi hoặc tàu khai thác', kiem: ['truy_nguon', 'ma_so_vung', 'iuu', 'eu_list'] },
     US: { muc: 'Ao nuôi hoặc tàu khai thác', kiem: ['fda', 'simp'] },
     CN: { muc: 'Ao nuôi và cơ sở', kiem: ['gacc', 'ma_so_vung'] },
   },
@@ -81,10 +81,12 @@ export interface CheckResult {
 export interface TraceFacts {
   /** Tổng kg phân bổ vào lô xuất */
   tongKg: number;
-  /** Phần kg truy được tới thửa hoặc ao qua phiếu thu gom */
+  /** Phần kg truy được tới thửa, ao hoặc chuyến khai thác qua phiếu thu gom */
   truyDuocKg: number;
   loMua: { ma: string; eudrClass: string | null; coCoSo: boolean }[];
   nguon: { ma: string; maSoVung: string | null; coNhatKyThuoc: boolean; luuY: string[] }[];
+  /** Chuyến khai thác góp hàng, với điểm còn thiếu về IUU và SIMP */
+  chuyen?: { ma: string; thieuIuu: string[]; thieuSimp: string[] }[];
   /** Mã còn hiệu lực theo loại, của mọi cơ sở đã xử lý hàng của lô */
   maCoSo: Partial<Record<FacilityScheme, string[]>>;
   /** Cơ sở thiếu mã theo loại */
@@ -107,14 +109,16 @@ function facilityCheck(scheme: FacilityScheme, f: TraceFacts): CheckResult {
 /** Kiểm từng điểm của cặp ngành × thị trường trên dữ liệu đã gom của một lô xuất. */
 export function traceChecks(rule: MarketRule, f: TraceFacts): CheckResult[] {
   const allTraced = f.tongKg > 0 && f.truyDuocKg + 0.5 >= f.tongKg;
+  const chuyen = f.chuyen ?? [];
+  const soNguon = [f.nguon.length ? `${f.nguon.length} thửa/ao` : '', chuyen.length ? `${chuyen.length} chuyến khai thác` : ''].filter(Boolean).join(', ');
   return rule.kiem.map((k): CheckResult => {
     switch (k) {
       case 'truy_nguon':
         return {
           ma: k,
-          ten: 'Mọi kg truy được tới thửa hoặc ao qua phiếu thu gom',
+          ten: 'Mọi kg truy được tới thửa, ao hoặc chuyến khai thác qua phiếu thu gom',
           dat: allTraced,
-          chiTiet: f.tongKg === 0 ? ['Lô xuất chưa có hàng phân bổ'] : allTraced ? [`${f.nguon.length} thửa/ao góp hàng`] : [`Mới truy được ${fmt(f.truyDuocKg)} / ${fmt(f.tongKg)} kg; phần còn lại ghi tay, không theo phiếu`],
+          chiTiet: f.tongKg === 0 ? ['Lô xuất chưa có hàng phân bổ'] : allTraced ? [`${soNguon} góp hàng`] : [`Mới truy được ${fmt(f.truyDuocKg)} / ${fmt(f.tongKg)} kg; phần còn lại ghi tay, không theo phiếu`],
           canXacMinh: false,
         };
       case 'eudr': {
@@ -133,6 +137,8 @@ export function traceChecks(rule: MarketRule, f: TraceFacts): CheckResult[] {
         };
       }
       case 'ma_so_vung': {
+        if (f.nguon.length === 0 && chuyen.length > 0)
+          return { ma: k, ten: 'Mã số vùng trồng / mã cơ sở nuôi do cơ quan nhà nước cấp, đã đối chiếu giấy chứng nhận', dat: true, chiTiet: ['Hàng khai thác, không có ao nuôi; giấy khai thác kiểm ở mục riêng'], canXacMinh: true };
         const thieu = f.nguon.filter((n) => !n.maSoVung).map((n) => n.ma);
         return {
           ma: k,
@@ -142,15 +148,35 @@ export function traceChecks(rule: MarketRule, f: TraceFacts): CheckResult[] {
           canXacMinh: true,
         };
       }
+      case 'iuu': {
+        const thieu = chuyen.flatMap((c) => c.thieuIuu.map((x) => `${c.ma}: ${x}`));
+        return {
+          ma: k,
+          ten: 'Hàng khai thác có giấy chứng nhận khai thác, tàu có giấy phép (chống khai thác IUU)',
+          dat: thieu.length === 0,
+          chiTiet: chuyen.length === 0 ? ['Không có hàng khai thác trong lô'] : thieu.length ? thieu : [`${chuyen.length} chuyến đều có giấy`],
+          canXacMinh: true,
+        };
+      }
       case 'simp':
         if (!f.simp) return { ma: k, ten: 'Dữ liệu SIMP cho người nhập Mỹ', dat: true, chiTiet: ['Loài này không thuộc danh sách SIMP theo phần mềm'], canXacMinh: true };
+      {
+        const aoThieu = f.nguon.filter((n) => !n.maSoVung).map((n) => n.ma);
+        const chuyenThieu = chuyen.flatMap((c) => c.thieuSimp.map((x) => `${c.ma}: ${x}`));
+        const chiTiet = allTraced
+          ? [
+              ...(aoThieu.length ? [`Ao chưa có mã cơ sở nuôi đã duyệt còn hiệu lực: ${aoThieu.join(', ')}`] : []),
+              ...chuyenThieu,
+            ]
+          : [`Mới truy được ${fmt(f.truyDuocKg)} / ${fmt(f.tongKg)} kg tới ao nuôi hoặc chuyến khai thác`];
         return {
           ma: k,
           ten: 'Dữ liệu SIMP cho người nhập Mỹ: nơi nuôi hoặc nơi đánh bắt của mọi kg',
-          dat: allTraced && f.nguon.every((n) => !!n.maSoVung),
-          chiTiet: allTraced ? (f.nguon.every((n) => !!n.maSoVung) ? ['Mọi ao góp hàng có mã cơ sở nuôi đã duyệt, còn hiệu lực'] : ['Có ao chưa có mã cơ sở nuôi đã duyệt còn hiệu lực']) : [`Mới truy được ${fmt(f.truyDuocKg)} / ${fmt(f.tongKg)} kg tới ao nuôi`],
+          dat: allTraced && aoThieu.length === 0 && chuyenThieu.length === 0,
+          chiTiet: chiTiet.length ? chiTiet : ['Mọi ao có mã cơ sở nuôi đã duyệt, mọi chuyến có đủ dữ liệu tàu và giấy phép'],
           canXacMinh: true,
         };
+      }
       default:
         return facilityCheck(k, f);
     }

@@ -55,4 +55,18 @@ describe('truy xuất theo ngành × thị trường', () => {
     expect(traceChecks(rule, facts({ simp: true, truyDuocKg: 500 })).find((c) => c.ma === 'simp')!.dat).toBe(false);
     expect(traceChecks(rule, facts({ simp: false, truyDuocKg: 0 })).find((c) => c.ma === 'simp')!.dat).toBe(true);
   });
+
+  it('hàng khai thác: không cần mã cơ sở nuôi; EU kiểm giấy khai thác; SIMP kiểm giấy phép tàu', () => {
+    const chiKhaiThac = facts({ nguon: [], simp: true, chuyen: [{ ma: 'CH1', thieuIuu: ['chưa có số giấy chứng nhận / xác nhận thủy sản khai thác'], thieuSimp: [] }] });
+    const eu = traceChecks(ruleFor('thuy_san', 'EU')!, chiKhaiThac);
+    expect(eu.map((c) => [c.ma, c.dat])).toEqual([['truy_nguon', true], ['ma_so_vung', true], ['iuu', false], ['eu_list', false]]);
+    expect(eu.find((c) => c.ma === 'iuu')!.chiTiet).toEqual(['CH1: chưa có số giấy chứng nhận / xác nhận thủy sản khai thác']);
+    expect(eu[0].chiTiet).toEqual(['1 chuyến khai thác góp hàng']);
+    const us = traceChecks(ruleFor('thuy_san', 'US')!, chiKhaiThac).find((c) => c.ma === 'simp')!;
+    expect(us.dat).toBe(true);
+    const thieuGp = traceChecks(ruleFor('thuy_san', 'US')!, facts({ nguon: [], simp: true, chuyen: [{ ma: 'CH1', thieuIuu: [], thieuSimp: ['tàu X chưa ghi giấy phép khai thác'] }] })).find((c) => c.ma === 'simp')!;
+    expect(thieuGp).toMatchObject({ dat: false, chiTiet: ['CH1: tàu X chưa ghi giấy phép khai thác'] });
+    // Lô chỉ có hàng nuôi: mục IUU đạt
+    expect(traceChecks(ruleFor('thuy_san', 'EU')!, facts()).find((c) => c.ma === 'iuu')!.dat).toBe(true);
+  });
 });

@@ -3,7 +3,8 @@ import { and, asc, between, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { DB, Db, DbExecutor } from '../db/db';
-import { collectionSlips, commodities, farmers, growingAreas, lotEvents, partners, plots, PurchaseLot, purchaseLots, settings, sprayLogs, users } from '../db/schema';
+import { catchTrips, collectionSlips, commodities, farmers, fishingVessels, growingAreas, lotEvents, partners, plots, PurchaseLot, purchaseLots, settings, sprayLogs, users } from '../db/schema';
+import { iuuIssues } from './catch.rules';
 import { phiIssues } from './trace.rules';
 import {
   capRefusal,
@@ -22,8 +23,9 @@ import {
 import { SourcingService } from './sourcing.service';
 
 export interface SlipInput {
-  farmerId: string;
-  plotId: string;
+  farmerId?: string | null;
+  plotId?: string | null;
+  catchTripId?: string | null;
   harvestDate: string;
   quantityKg: number;
   moisturePct?: number | null;
@@ -130,15 +132,17 @@ export class CollectionService {
     const source = await this.access(lot, ctx, false, this.db);
     const [{ sector, commodityName }] = await this.db.select({ sector: commodities.sector, commodityName: commodities.name }).from(commodities).where(eq(commodities.id, lot.commodityId));
     const slips = await this.db
-      .select({ s: collectionSlips, farmerName: farmers.fullName, farmerCode: farmers.code, plotCode: plots.code, createdByName: users.fullName })
+      .select({ s: collectionSlips, farmerName: farmers.fullName, farmerCode: farmers.code, plotCode: plots.code, tripCode: catchTrips.code, vesselNo: fishingVessels.registrationNo, createdByName: users.fullName })
       .from(collectionSlips)
-      .innerJoin(farmers, eq(farmers.id, collectionSlips.farmerId))
-      .innerJoin(plots, eq(plots.id, collectionSlips.plotId))
+      .leftJoin(farmers, eq(farmers.id, collectionSlips.farmerId))
+      .leftJoin(plots, eq(plots.id, collectionSlips.plotId))
+      .leftJoin(catchTrips, eq(catchTrips.id, collectionSlips.catchTripId))
+      .leftJoin(fishingVessels, eq(fishingVessels.id, catchTrips.vesselId))
       .innerJoin(users, eq(users.id, collectionSlips.createdBy))
       .where(eq(collectionSlips.purchaseLotId, lotId))
       .orderBy(asc(collectionSlips.createdAt));
     const canWrite = lot.status === 'thu_gom' && (source === 'cong_ncc' || this.staffCanWrite(lot, ctx));
-    const choices = canWrite ? await this.choices(lot.supplierPartnerId, sector) : { ho: [], thua: [] };
+    const choices = canWrite ? await this.choices(lot.supplierPartnerId, sector) : { ho: [], thua: [], chuyen: [] };
     return {
       lo: { id: lot.id, code: lot.code, status: lot.status, collectedKg: lot.collectedKg, eudrClass: lot.eudrClass, sector, commodityName, apDungEudr: EUDR_SECTORS.includes(sector) },
       duocGhi: canWrite,
@@ -148,6 +152,8 @@ export class CollectionService {
         farmerName: x.farmerName,
         farmerCode: x.farmerCode,
         plotCode: x.plotCode,
+        tripCode: x.tripCode,
+        vesselNo: x.vesselNo,
         harvestDate: x.s.harvestDate,
         quantityKg: x.s.quantityKg,
         moisturePct: x.s.moisturePct,
@@ -189,7 +195,26 @@ export class CollectionService {
           .groupBy(collectionSlips.plotId)
       : [];
     const usedBy = new Map(used.map((u) => [u.plotId, u.kg]));
+    // Thủy sản: chuyến khai thác còn hàng chưa thu gom
+    const chuyen =
+      sector === 'thuy_san'
+        ? (
+            await this.db
+              .select({
+                id: catchTrips.id, code: catchTrips.code, landedOn: catchTrips.landedOn, species: catchTrips.species, catchKg: catchTrips.catchKg, vesselNo: fishingVessels.registrationNo,
+                certificateNo: catchTrips.certificateNo,
+                usedKg: sql<number>`coalesce((select sum(s.quantity_kg) from collection_slips s where s.catch_trip_id = "catch_trips"."id" and s.voided_at is null), 0)::float8`,
+              })
+              .from(catchTrips)
+              .innerJoin(fishingVessels, eq(fishingVessels.id, catchTrips.vesselId))
+              .where(and(eq(catchTrips.supplierPartnerId, partnerId), isNull(catchTrips.voidedAt)))
+              .orderBy(desc(catchTrips.landedOn))
+          )
+            .map((c) => ({ id: c.id, code: c.code, landedOn: c.landedOn, species: c.species, vesselNo: c.vesselNo, coGiay: !!c.certificateNo, conLaiKg: r2(Math.max(c.catchKg - c.usedKg, 0)) }))
+            .filter((c) => c.conLaiKg > 0)
+        : [];
     return {
+      chuyen,
       ho,
       thua: rows.map((r) => {
         const cap = plotCapKg(r.p.areaHa, yieldFor(r.areaYield, setting, sector));
@@ -220,6 +245,8 @@ export class CollectionService {
       if (lot.status !== 'thu_gom') throw new BadRequestException('Lô đã qua bước thu gom');
       if (input.harvestDate > today()) throw new BadRequestException('Ngày thu hoạch không được sau hôm nay');
       if (!(input.quantityKg > 0)) throw new BadRequestException('Khối lượng phải lớn hơn 0');
+      if (input.catchTripId) return this.createFromTrip(tx, lot, source, input, ctx, ip);
+      if (!input.farmerId || !input.plotId) throw new BadRequestException('Chọn hộ và thửa, hoặc chọn chuyến khai thác');
 
       const [f] = await tx.select().from(farmers).where(eq(farmers.id, input.farmerId));
       if (!f || f.supplierPartnerId !== lot.supplierPartnerId) throw new BadRequestException('Hộ không thuộc nhà cung cấp của lô');
@@ -300,6 +327,51 @@ export class CollectionService {
       );
       return { id: slip.id, code, eudrOk, eudrReasons: reasons, luuY: traceIssues };
     });
+  }
+
+  /** Phiếu thu gom từ một chuyến khai thác: không vượt sản lượng còn lại của chuyến, ngày nhận không trước ngày cập cảng. */
+  private async createFromTrip(tx: DbExecutor, lot: PurchaseLot, source: 'noi_bo' | 'cong_ncc', input: SlipInput, ctx: AuthContext, ip: string | null) {
+    const [{ sector }] = await tx.select({ sector: commodities.sector }).from(commodities).where(eq(commodities.id, lot.commodityId));
+    if (sector !== 'thuy_san') throw new BadRequestException('Chỉ lô thủy sản nhận hàng từ chuyến khai thác');
+    // Khoá chuyến để hai phiếu ghi cùng lúc không cùng vượt sản lượng
+    const [t] = await tx.select().from(catchTrips).where(eq(catchTrips.id, input.catchTripId!)).for('update');
+    if (!t || t.supplierPartnerId !== lot.supplierPartnerId) throw new BadRequestException('Chuyến không thuộc nhà cung cấp của lô');
+    if (t.voidedAt) throw new BadRequestException('Chuyến đã bị huỷ');
+    if (input.harvestDate < t.landedOn) throw new BadRequestException('Ngày nhận hàng không được trước ngày tàu cập cảng');
+    const [v] = await tx.select().from(fishingVessels).where(eq(fishingVessels.id, t.vesselId));
+    const [{ used }] = await tx
+      .select({ used: sql<number>`coalesce(sum(${collectionSlips.quantityKg}), 0)::float8` })
+      .from(collectionSlips)
+      .where(and(eq(collectionSlips.catchTripId, t.id), isNull(collectionSlips.voidedAt)));
+    const qty = r2(input.quantityKg);
+    if (used + qty > t.catchKg + 0.005) throw new BadRequestException(`Vượt sản lượng của chuyến ${t.code}: còn ${r2(t.catchKg - used).toLocaleString('vi-VN')} kg`);
+    const traceIssues = iuuIssues({ code: t.code, landedOn: t.landedOn, certificateNo: t.certificateNo, vessel: { registrationNo: v.registrationNo, lengthM: v.lengthM, hasVms: v.hasVms, licenseNo: v.licenseNo, licenseValidUntil: v.licenseValidUntil } }).map(
+      (x) => `Chuyến ${t.code}: ${x}`,
+    );
+    const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(collectionSlips).where(eq(collectionSlips.purchaseLotId, lot.id));
+    const code = `${lot.code}-P${String(n + 1).padStart(3, '0')}`;
+    const [slip] = await tx
+      .insert(collectionSlips)
+      .values({
+        code, purchaseLotId: lot.id, supplierPartnerId: lot.supplierPartnerId, catchTripId: t.id, harvestDate: input.harvestDate, quantityKg: qty,
+        moisturePct: input.moisturePct ?? null, weighTicketNo: input.weighTicketNo ?? null, eudrOk: null, eudrReasons: [], capKg: t.catchKg, traceIssues, source,
+        note: input.note ?? null, createdBy: ctx.user.id,
+      })
+      .returning();
+    await tx.update(purchaseLots).set({ collectedKg: r2(lot.collectedKg + qty), updatedAt: new Date() }).where(eq(purchaseLots.id, lot.id));
+    await tx.insert(lotEvents).values({
+      purchaseLotId: lot.id,
+      kind: 'thu_gom',
+      quantityKg: qty,
+      note: `Phiếu ${code} · chuyến ${t.code} · tàu ${v.registrationNo}`,
+      detail: { phieu: code, chuyen: t.code, tau: v.registrationNo, ngayNhan: input.harvestDate },
+      actorUserId: ctx.user.id,
+    });
+    await this.audit.record(
+      { actorUserId: ctx.user.id, action: 'phieu_thu_gom.tao', entityType: 'collection_slip', entityId: slip.id, ip, detail: { code, lo: lot.code, chuyen: t.code, tau: v.registrationNo, kg: qty, nguon: source } },
+      tx,
+    );
+    return { id: slip.id, code, eudrOk: null, eudrReasons: [] as string[], luuY: traceIssues };
   }
 
   /** Huỷ phiếu sai khi lô còn đang thu gom; khối lượng được trừ lại. Nhãn EUDR của lô giữ nguyên. */

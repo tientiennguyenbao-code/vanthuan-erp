@@ -2,8 +2,9 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nest
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { AuthContext } from '../auth/auth.types';
 import { DB, Db } from '../db/db';
-import { collectionSlips, commodities, exportLots, facilities, facilityCodes, farmers, growingAreas, lotAllocations, lotEvents, partners, plots, purchaseLots, sprayLogs } from '../db/schema';
+import { catchTrips, collectionSlips, commodities, fishingVessels, exportLots, facilities, facilityCodes, farmers, growingAreas, lotAllocations, lotEvents, partners, plots, purchaseLots, sprayLogs } from '../db/schema';
 import { codeInEffect } from '../sourcing/area-code.rules';
+import { iuuIssues, simpIssues } from '../sourcing/catch.rules';
 import { FACILITY_SCHEMES, FacilityScheme, isSimpSpecies, ruleFor, traceChecks, TraceFacts } from '../sourcing/trace.rules';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -93,6 +94,36 @@ export class TraceService {
         bySource.set(s.plot.id, { plot: s.plot, farmerCode: s.farmerCode, areaCode: s.areaCode, areaName: s.areaName, officialCode: codeInEffect(s.codeValidUntil, today()) ? s.officialCode : null, codeExpired: !!s.officialCode && !codeInEffect(s.codeValidUntil, today()), kg: share, from: s.from, to: s.to, issues: new Set(s.issues) });
       }
     }
+    // Phiếu theo (lô mua, chuyến khai thác)
+    const tripSlips = lotIds.length
+      ? await this.db
+          .select({
+            purchaseLotId: collectionSlips.purchaseLotId,
+            t: catchTrips,
+            v: fishingVessels,
+            kg: sql<number>`sum(${collectionSlips.quantityKg})::float8`,
+          })
+          .from(collectionSlips)
+          .innerJoin(catchTrips, eq(catchTrips.id, collectionSlips.catchTripId))
+          .innerJoin(fishingVessels, eq(fishingVessels.id, catchTrips.vesselId))
+          .where(and(inArray(collectionSlips.purchaseLotId, lotIds), isNull(collectionSlips.voidedAt)))
+          .groupBy(collectionSlips.purchaseLotId, catchTrips.id, fishingVessels.id)
+      : [];
+    const byTrip = new Map<string, { t: (typeof tripSlips)[number]['t']; v: (typeof tripSlips)[number]['v']; kg: number }>();
+    for (const x of tripSlips) {
+      const a = allocBy.get(x.purchaseLotId)!;
+      const share = a.collectedKg > 0 ? (x.kg * a.kg) / a.collectedKg : 0;
+      const cur = byTrip.get(x.t.id);
+      if (cur) cur.kg += share;
+      else byTrip.set(x.t.id, { t: x.t, v: x.v, kg: share });
+    }
+    const trips = [...byTrip.values()]
+      .sort((x, y) => x.t.code.localeCompare(y.t.code))
+      .map((x) => {
+        const f = { code: x.t.code, landedOn: x.t.landedOn, certificateNo: x.t.certificateNo, vessel: { registrationNo: x.v.registrationNo, lengthM: x.v.lengthM, hasVms: x.v.hasVms, licenseNo: x.v.licenseNo, licenseValidUntil: x.v.licenseValidUntil } };
+        return { ...x, thieuIuu: iuuIssues(f), thieuSimp: simpIssues(f) };
+      });
+
     const sources = [...bySource.values()].sort((x, y) => x.plot.code.localeCompare(y.plot.code));
 
     // Nhật ký thuốc trong 12 tháng trước lần thu hoạch cuối
@@ -132,15 +163,16 @@ export class TraceService {
     }
 
     const tongKg = r2(allocs.reduce((s, a) => s + a.kg, 0));
-    const truyDuocKg = r2(sources.reduce((s, x) => s + x.kg, 0));
+    const truyDuocKg = r2(sources.reduce((s, x) => s + x.kg, 0) + trips.reduce((s, x) => s + x.kg, 0));
     const facts: TraceFacts = {
       tongKg,
       truyDuocKg,
       loMua: allocs.map((a) => ({ ma: a.code, eudrClass: a.eudrClass, coCoSo: (facOfLot.get(a.purchaseLotId)?.size ?? 0) > 0 })),
       nguon: sources.map((s) => ({ ma: s.plot.code, maSoVung: s.officialCode, coNhatKyThuoc: sprayed.has(s.plot.id), luuY: [...s.issues] })),
+      chuyen: trips.map((x) => ({ ma: x.t.code, thieuIuu: x.thieuIuu, thieuSimp: x.thieuSimp })),
       maCoSo,
       coSoThieu,
-      simp: sector === 'thuy_san' && isSimpSpecies(row.commodityName, ...sources.map((s) => s.plot.crop)),
+      simp: sector === 'thuy_san' && isSimpSpecies(row.commodityName, ...sources.map((s) => s.plot.crop), ...trips.map((x) => x.t.species)),
     };
     const rule = ruleFor(sector, lot.market);
     const kiemTra = rule ? traceChecks(rule, facts) : [];
@@ -175,6 +207,22 @@ export class TraceService {
         thuHoachDen: s.to,
         coNhatKyThuoc: sector === 'gia_vi' ? sprayed.has(s.plot.id) : null,
         luuY: [...s.issues],
+      })),
+      chuyen: trips.map((x) => ({
+        ma: x.t.code,
+        tau: x.v.registrationNo,
+        tenTau: x.v.name,
+        quocTich: x.v.flag,
+        nghe: x.v.gear,
+        giayPhep: x.v.licenseNo,
+        cang: x.t.landingPort,
+        vungKhaiThac: x.t.fishingArea,
+        loai: x.t.species,
+        ngayDi: x.t.departedOn,
+        ngayCap: x.t.landedOn,
+        giayKhaiThac: x.t.certificateNo,
+        khoiLuongKg: r2(x.kg),
+        thieu: [...new Set([...x.thieuIuu, ...x.thieuSimp])],
       })),
       coSo: facRows.map((f) => ({ ten: f.name, loai: f.kind, ma: valid.filter((c) => c.facilityId === f.id).map((c) => ({ loai: c.scheme, ma: c.code, hieuLucDen: c.validUntil })) })),
     };

@@ -37,7 +37,7 @@ GeoJSON xuất ra có `ProducerCountry`, `ProductionPlace`, `Area` cho mỗi th�
 
 ## Chưa làm (các bước sau)
 
-Bước 5b: thủy sản khai thác (giấy khai thác IUU theo tàu, chuyến; phiếu thu gom từ chuyến khai thác) và dữ liệu SIMP đầy đủ cho người nhập Mỹ; nối gói EUDR với dòng "Hồ sơ thẩm định EUDR" của checklist chứng từ; nhập tệp KML.
+Nạp danh sách tàu và giấy khai thác từ hệ thống của cơ quan quản lý nghề cá để tự so; nối gói EUDR với dòng "Hồ sơ thẩm định EUDR" của checklist chứng từ; nhập tệp KML.
 
 ## Bước 2: phiếu thu gom, trần sản lượng, nhãn đủ EUDR
 
@@ -86,3 +86,12 @@ Bước 5b: thủy sản khai thác (giấy khai thác IUU theo tàu, chuyến; 
 - Chỉ mã đã duyệt mới ghi vào vùng (`growing_areas.official_code`, kèm hạn). Truy xuất lô xuất chỉ tính mã còn hiệu lực vào ngày xem; mã hết hạn hiện "Mã đã hết hạn".
 - Migration chuyển các mã đã ghi trước đây thành lần gửi chờ duyệt.
 - Bước sau (chưa làm): định kỳ nạp danh sách mã do cơ quan cấp công bố, và danh sách mã được nước nhập khẩu chấp thuận, để phần mềm tự so.
+
+## Bước 5b: thủy sản khai thác
+
+- **Tàu cá** (bảng `fishing_vessels`): số đăng ký (viết hoa, không trùng trong cùng nhà cung cấp), tên tàu, chủ tàu, quốc tịch, chiều dài, nghề, giấy phép khai thác và hạn, có thiết bị giám sát hành trình (VMS) hay không. Không ghi được giấy phép đã hết hạn. Huỷ tàu có lý do.
+- **Chuyến khai thác** (bảng `catch_trips`, mã `<mã NCC>-CHnnn`): tàu, ngày đi, ngày cập cảng, cảng cá, vùng khai thác, loài, sản lượng, số giấy chứng nhận khai thác, nơi cấp, ngày cấp. Ngày cập cảng không sau hôm nay; ngày đi không sau ngày cập; giấy cấp không trước ngày cập. Chỉ huỷ được chuyến chưa có phiếu thu gom.
+- HTX, công ty ghi trên cổng (mục Tàu cá); nhân viên thu mua ghi ở hồ sơ nguồn cung (quyền `NGUON_CUNG_QUAN_LY`, xem cần `NGUON_CUNG_XEM`).
+- **Phiếu thu gom từ chuyến**: chỉ cho lô mua thủy sản; một phiếu lấy từ một chuyến, không kèm hộ/ao. Ngày giao không trước ngày cập cảng; tổng kg các phiếu không vượt sản lượng chuyến. Phiếu ghi lưu ý khi chuyến còn thiếu điều kiện IUU.
+- **Điều kiện IUU** (`apps/api/src/sourcing/catch.rules.ts`): có giấy khai thác; tàu có giấy phép còn hạn vào ngày cập cảng; tàu từ 15 m trở lên có VMS. **SIMP** (Mỹ): tàu có giấy phép còn hạn. Truy xuất lô xuất đi EU thêm điểm "iuu"; đi Mỹ, điểm SIMP gộp cả ao nuôi và chuyến khai thác. Mốc 15 m và các điều kiện là hiểu biết chung, cần xác minh với văn bản gốc.
+- Truy xuất lô xuất có bảng chuyến khai thác (tàu, nghề, cảng, vùng, giấy khai thác, kg góp vào lô). Lô chỉ có hàng khai thác thì điểm mã cơ sở nuôi coi như đạt.

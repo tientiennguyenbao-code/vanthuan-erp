@@ -10,6 +10,7 @@ interface TruyXuat {
   nganh: string; thiTruong: string; mucTruyXuat: string | null; tongKg: number; truyDuocKg: number; dat: boolean;
   kiemTra: Kiem[];
   loMua: { ma: string; nhaCungCap: string; khoiLuongKg: number; nhanEudr: string | null; maCoSoDongGoi: string | null; coSo: string[] }[];
+  chuyen: { ma: string; tau: string; tenTau: string | null; quocTich: string; nghe: string; giayPhep: string | null; cang: string; vungKhaiThac: string; loai: string; ngayDi: string; ngayCap: string; giayKhaiThac: string | null; khoiLuongKg: number; thieu: string[] }[];
   nguon: { ma: string; loai: string; maHo: string; maVung: string; tenVung: string; maSoVung: string | null; maSoVungHetHan: boolean; cayTrong: string | null; khoiLuongKg: number; thuHoachTu: string; thuHoachDen: string; coNhatKyThuoc: boolean | null; luuY: string[] }[];
   coSo: { ten: string; loai: string; ma: { loai: string; ma: string; hieuLucDen: string | null }[] }[];
 }
@@ -37,7 +38,7 @@ export function TruyXuatLo({ loId }: { loId: string }) {
       <p className="phu">
         {NGANH[d.nganh]} sang {THI_TRUONG[d.thiTruong] ?? d.thiTruong}
         {d.mucTruyXuat ? <> · mức truy xuất tối thiểu: <strong>{d.mucTruyXuat}</strong></> : ' · chưa có quy tắc cho thị trường này'}
-        {' '}· truy được {kg(d.truyDuocKg)} / {kg(d.tongKg)} ({ty}%) tới thửa hoặc ao.
+        {' '}· truy được {kg(d.truyDuocKg)} / {kg(d.tongKg)} ({ty}%) tới thửa, ao hoặc chuyến khai thác.
       </p>
       {d.kiemTra.length > 0 && (
         <div className="o" style={{ marginBottom: 12 }}>
@@ -54,7 +55,7 @@ export function TruyXuatLo({ loId }: { loId: string }) {
         </div>
       )}
 
-      <div className="bang-cuon">
+      {(d.nguon.length > 0 || (d.chuyen ?? []).length === 0) && <div className="bang-cuon">
         <table>
           <thead><tr><th>Thửa / ao</th><th>Hộ</th><th>Vùng</th><th>Mã số vùng / cơ sở nuôi</th><th>Thu hoạch</th><th className="so">Khối lượng trong lô</th>{d.nganh === 'gia_vi' && <th>Nhật ký thuốc</th>}</tr></thead>
           <tbody>
@@ -72,7 +73,27 @@ export function TruyXuatLo({ loId }: { loId: string }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
+
+      {(d.chuyen ?? []).length > 0 && (
+        <div className="bang-cuon" style={{ marginTop: 12 }}>
+          <table>
+            <thead><tr><th>Chuyến khai thác</th><th>Tàu</th><th>Vùng khai thác</th><th>Cập cảng</th><th>Giấy khai thác</th><th className="so">Khối lượng trong lô</th></tr></thead>
+            <tbody>
+              {d.chuyen.map((c) => (
+                <tr key={c.ma}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{c.ma}<div className="phu">{c.loai}</div>{c.thieu.map((x) => <div key={x} className="canh-bao-nhe" style={{ whiteSpace: 'normal' }}>{x}</div>)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{c.tau}<div className="phu">{[c.tenTau, c.quocTich, c.nghe].filter(Boolean).join(' · ')}</div><div className="phu">{c.giayPhep ? `GP ${c.giayPhep}` : 'chưa có giấy phép'}</div></td>
+                  <td>{c.vungKhaiThac}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{ngay(c.ngayCap)}<div className="phu">{c.cang}</div></td>
+                  <td>{c.giayKhaiThac ?? <span className="canh-bao-nhe">Chưa có</span>}</td>
+                  <td className="so">{kg(c.khoiLuongKg)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="luoi" style={{ marginTop: 12 }}>
         <div className="o">
