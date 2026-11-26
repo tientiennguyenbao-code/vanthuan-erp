@@ -128,7 +128,7 @@ describe('Lô hàng: lô mua, lô xuất, phân bổ, giám định, booking', (
     const dup = await nv.post('/api/lo-xuat').send({ hopDongDoiUngId: ids.banA, thiTruong: 'US' }).expect(400);
     expect(dup.body.message).toMatch(/đã có lô xuất/);
     await nv.post('/api/lo-xuat').send({ hopDongDoiUngId: ids.mua1, thiTruong: 'US' }).expect(400);
-    ids.lxB = (await nv.post('/api/lo-xuat').send({ hopDongDoiUngId: ids.banB, thiTruong: 'EU' }).expect(201)).body.id;
+    ids.lxB = (await nv.post('/api/lo-xuat').send({ hopDongDoiUngId: ids.banB, thiTruong: 'CN' }).expect(201)).body.id;
   });
 
   it('phân bổ: chỉ lô đã sơ chế, không vượt khối lượng còn lại', async () => {
@@ -215,7 +215,7 @@ describe('Lô hàng: lô mua, lô xuất, phân bổ, giám định, booking', (
     await nv.post(`/api/lo-xuat/${ids.lxB}/huy`).send({ lyDo: 'Người mua hoãn' }).expect(200);
     const lm = await nv.get(`/api/lo-mua/${ids.lm1}`).expect(200);
     expect(lm.body.unallocatedKg).toBe(3000);
-    await nv.post('/api/lo-xuat').send({ hopDongDoiUngId: ids.banB, thiTruong: 'EU' }).expect(400);
+    await nv.post('/api/lo-xuat').send({ hopDongDoiUngId: ids.banB, thiTruong: 'CN' }).expect(400);
     await expect(pool.query(`update lot_events set note = 'x' where export_lot_id = $1`, [ids.lxA])).rejects.toThrow(/chỉ được ghi thêm/);
     await expect(pool.query(`delete from lot_events where export_lot_id = $1`, [ids.lxA])).rejects.toThrow(/chỉ được ghi thêm/);
   });

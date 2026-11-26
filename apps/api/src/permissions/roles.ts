@@ -104,6 +104,8 @@ export const PERMISSIONS = [
   'NGUON_CUNG_QUAN_LY',
   /** Xem đầy đủ số CCCD của nông hộ (mỗi lần xem được ghi nhật ký) */
   'NGUON_CUNG_XEM_CCCD',
+  /** Đặt năng suất tối đa (kg/ha/năm) theo ngành và theo vùng: trần sản lượng của thửa */
+  'NANG_SUAT_DAT',
   // Danh mục
   'DANH_MUC_QUAN_LY',
   // Quản trị
@@ -127,6 +129,7 @@ const BAN_GIAM_DOC: Permission[] = [
   'NHAT_KY_XEM',
   'KHIEU_NAI_GIAI_QUYET',
   'NGUON_CUNG_XEM',
+  'NANG_SUAT_DAT',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {

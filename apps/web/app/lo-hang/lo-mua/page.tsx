@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { kg, LOAI_GIAO_DICH, TRANG_THAI_LO_MUA } from '@/lib/lo-hang';
+import { NhanEudr } from '@/lib/thu-gom';
 import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from '../../khung-trang';
 
 interface DongLoMua {
   id: string;
+  eudrClass: string | null;
   code: string;
   dealType: string;
   status: string;
@@ -111,7 +113,7 @@ export default function DanhSachLoMua() {
                 <td><Link href={`/lo-hang/lo-mua/${d.id}`}>{d.code}</Link><div className="phu">{d.contractCode} · {LOAI_GIAO_DICH[d.dealType]}</div></td>
                 <td>{d.supplierName}{d.growingAreaCode && <div className="phu">Vùng trồng {d.growingAreaCode}</div>}</td>
                 <td>{d.commodityName}</td>
-                <td>{TRANG_THAI_LO_MUA[d.status]}</td>
+                <td>{TRANG_THAI_LO_MUA[d.status]}{d.eudrClass && <div><NhanEudr eudrClass={d.eudrClass} /></div>}</td>
                 <td>{kg(d.collectedKg)}</td>
                 <td>{d.status === 'thu_gom' ? '—' : kg(d.availableKg)}</td>
                 <td>{d.status === 'thu_gom' ? '—' : kg(d.unallocatedKg)}</td>

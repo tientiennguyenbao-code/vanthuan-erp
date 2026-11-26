@@ -37,6 +37,7 @@ import {
   signal,
   toKg,
 } from './lot.rules';
+import { EUDR_SECTORS } from '../sourcing/collection.rules';
 
 export interface PurchaseEventInput {
   kind: 'thu_gom' | 'so_che' | 'nhap_kho';
@@ -181,6 +182,11 @@ export class LotsService {
     });
   }
 
+  /** Nhân viên thu mua xem mọi lô mua (để ghi phiếu thu gom), không xem lô xuất. */
+  private seesAllPurchase(ctx: AuthContext) {
+    return this.canSeeAll(ctx) || ctx.permissions.includes('NGUON_CUNG_QUAN_LY');
+  }
+
   async listPurchaseLots(ctx: AuthContext, filter: { status?: string; commodityId?: string; dealType?: string; conHang?: boolean }) {
     const rows = await this.db
       .select({
@@ -196,7 +202,7 @@ export class LotsService {
       .innerJoin(contracts, eq(contracts.id, purchaseLots.contractId))
       .where(
         and(
-          this.ownFilter(ctx, purchaseLots.ownerUserId),
+          this.seesAllPurchase(ctx) ? undefined : this.ownFilter(ctx, purchaseLots.ownerUserId),
           filter.status ? eq(purchaseLots.status, filter.status) : undefined,
           filter.commodityId ? eq(purchaseLots.commodityId, filter.commodityId) : undefined,
           filter.dealType ? eq(purchaseLots.dealType, filter.dealType) : undefined,
@@ -220,6 +226,7 @@ export class LotsService {
         availableKg: available,
         allocatedKg: r.allocatedKg,
         unallocatedKg: r2(available - r.allocatedKg),
+        eudrClass: r.lot.eudrClass,
       };
     });
     return filter.conHang ? out.filter((x) => x.status !== 'thu_gom' && x.status !== 'da_huy' && x.unallocatedKg > 0) : out;
@@ -227,7 +234,7 @@ export class LotsService {
 
   async getPurchaseLot(id: string, ctx: AuthContext) {
     const lot = await this.findPurchaseLot(id, this.db);
-    this.assertCanView(lot, ctx);
+    if (!this.seesAllPurchase(ctx)) this.assertCanView(lot, ctx);
     const [info] = await this.db
       .select({ supplierName: partners.name, commodityName: commodities.name, contractCode: contracts.code, ownerName: users.fullName })
       .from(purchaseLots)
@@ -285,7 +292,14 @@ export class LotsService {
       if (input.kind === 'thu_gom') {
         if (lot.status !== 'thu_gom') throw new BadRequestException('Lô đã qua bước thu gom');
         if (!(input.quantityKg > 0)) throw new BadRequestException('Khối lượng thu gom phải lớn hơn 0');
-        await tx.update(purchaseLots).set({ collectedKg: r2(lot.collectedKg + input.quantityKg), updatedAt: new Date() }).where(eq(purchaseLots.id, id));
+        // Cà phê ghi tay (không theo hộ, thửa) là hàng không đủ EUDR; lô hàng đủ EUDR chỉ nhận phiếu thu gom.
+        const [{ sector }] = await tx.select({ sector: commodities.sector }).from(commodities).where(eq(commodities.id, lot.commodityId));
+        let eudrClass = lot.eudrClass;
+        if (EUDR_SECTORS.includes(sector)) {
+          if (lot.eudrClass === 'du') throw new BadRequestException('Lô này là hàng đủ điều kiện EUDR, chỉ ghi thu gom bằng phiếu theo hộ và thửa');
+          eudrClass = 'khong_du';
+        }
+        await tx.update(purchaseLots).set({ collectedKg: r2(lot.collectedKg + input.quantityKg), eudrClass, updatedAt: new Date() }).where(eq(purchaseLots.id, id));
         await this.event({ purchaseLotId: id, kind: 'thu_gom', quantityKg: input.quantityKg, facilityId: input.facilityId ?? null, note: input.note ?? null }, ctx, tx);
       } else if (input.kind === 'so_che') {
         if (lot.status !== 'thu_gom') throw new BadRequestException('Lô đã sơ chế rồi');
@@ -561,10 +575,12 @@ export class LotsService {
         .select({ allocated: sql<number>`coalesce(sum(${lotAllocations.quantityKg}), 0)::float8` })
         .from(lotAllocations)
         .where(and(eq(lotAllocations.purchaseLotId, lot.id), isNull(lotAllocations.cancelledAt)));
+      const [{ sector }] = await tx.select({ sector: commodities.sector }).from(commodities).where(eq(commodities.id, lot.commodityId));
       const refusal = allocationRefusal(
-        { status: lot.status, dealType: lot.dealType, commodityId: lot.commodityId, availableKg: r2(lot.collectedKg - lot.lossKg), allocatedKg: allocated },
+        { status: lot.status, dealType: lot.dealType, commodityId: lot.commodityId, availableKg: r2(lot.collectedKg - lot.lossKg), allocatedKg: allocated, eudrClass: lot.eudrClass },
         exp,
         input.quantityKg,
+        sector,
       );
       if (refusal) throw new BadRequestException(refusal);
       const [row] = await tx

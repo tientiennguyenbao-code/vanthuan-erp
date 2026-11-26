@@ -48,3 +48,31 @@ export async function fullFirstLogin(app: INestApplication, user: { email: strin
   await agent.post('/api/auth/doi-mat-khau').send({ matKhauCu: user.password, matKhauMoi: NEW_PASSWORD }).expect(200);
   return { agent, secret };
 }
+
+type Agent = Awaited<ReturnType<typeof fullFirstLogin>>['agent'];
+const eudrAgents = new WeakMap<INestApplication, Promise<{ tm: Agent; gd: Agent }>>();
+
+/**
+ * Ghi thu gom cà phê đủ điều kiện EUDR vào lô mua (để phân bổ được sang lô xuất EU):
+ * lập một vùng có năng suất riêng 10.000 kg/ha, một hộ, một thửa 4 ha, rồi một phiếu thu gom.
+ */
+export async function thuGomDuEudr(app: INestApplication, partnerId: string, lotId: string, kg: number) {
+  if (!eudrAgents.has(app)) {
+    eudrAgents.set(
+      app,
+      (async () => ({
+        tm: (await fullFirstLogin(app, await createUser(app, ['NHAN_VIEN_THU_MUA'], 'eudrtm'))).agent,
+        gd: (await fullFirstLogin(app, await createUser(app, ['GIAM_DOC'], 'eudrgd'))).agent,
+      }))(),
+    );
+  }
+  const { tm, gd } = await eudrAgents.get(app)!;
+  const vung = (await tm.post(`/api/nguon-cung/${partnerId}/vung`).send({ name: 'Vùng thử', kind: 'vung_trong', sector: 'ca_phe', province: 'Đắk Lắk' }).expect(201)).body.id;
+  await gd.put(`/api/nang-suat/vung/${vung}`).send({ kgMoiHa: 10_000 }).expect(200);
+  const ho = (await tm.post(`/api/nguon-cung/${partnerId}/ho`).send({ fullName: 'Hộ thử', province: 'Đắk Lắk', consentOn: '2026-11-01' }).expect(201)).body.id;
+  // Mỗi thửa một chỗ riêng để không bị cảnh báo trùng vị trí
+  const pt: [number, number] = [107.9 + Math.random() * 0.6, 12.4 + Math.random() * 0.6];
+  const thua = (await tm.post(`/api/nguon-cung/${partnerId}/thua`).send({ farmerId: ho, growingAreaId: vung, kind: 'thua', geometry: { type: 'Point', coordinates: pt }, declaredAreaHa: 4 }).expect(201)).body.id;
+  const r = await tm.post(`/api/lo-mua/${lotId}/phieu-thu-gom`).send({ farmerId: ho, plotId: thua, harvestDate: '2026-11-15', quantityKg: kg }).expect(201);
+  if (!r.body.eudrOk) throw new Error(`Phiếu chưa đủ EUDR: ${r.body.eudrReasons.join('; ')}`);
+}

@@ -38,3 +38,10 @@ GeoJSON xuất ra có `ProducerCountry`, `ProductionPlace`, `Area` cho mỗi th�
 ## Chưa làm (các bước sau)
 
 Phiếu thu gom và trần sản lượng (bước 2); kiểm tra phá rừng, duyệt 4 mắt, gói dữ liệu EUDR theo lô xuất (bước 3); kế hoạch thu mua (bước 4); nhập tệp KML.
+
+## Bước 2: phiếu thu gom, trần sản lượng, nhãn đủ EUDR
+
+- **Phiếu thu gom**: mỗi lần cân hàng của một hộ, từ một thửa, vào một lô mua. Khối lượng tự cộng vào lô mua. Nhân viên thu mua, người phụ trách lô hoặc HTX trên cổng (mục Thu gom) đều ghi được. Phiếu sai huỷ kèm lý do khi lô còn đang thu gom; khối lượng được trừ lại.
+- **Trần sản lượng**: trần của thửa trong 12 tháng = diện tích × năng suất tối đa. Ban Giám đốc đặt mức chung theo ngành và mức riêng cho vùng ở trang Nguồn cung → Năng suất tối đa. Phiếu làm vượt trần bị từ chối.
+- **Nhãn EUDR (chỉ cà phê)**: hàng của phiếu đủ EUDR khi vùng đã có mức năng suất và thửa không còn cảnh báo. Phiếu đầu tiên định nhãn cho cả lô; lô đủ EUDR không nhận hàng chưa đủ hay hàng ghi tay, và ngược lại. Bước 3 sẽ thêm điều kiện kiểm tra rừng.
+- **Chặn đi EU**: lô xuất thị trường EU chỉ phân bổ được lô mua cà phê có nhãn đủ EUDR.
