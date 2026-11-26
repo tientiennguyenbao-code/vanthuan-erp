@@ -365,6 +365,16 @@ export class ContractsService {
     return { contract: c, terms: this.readTerms(v.contentEnc, this.dataKey(c)) };
   }
 
+  /**
+   * Dùng nội bộ cho kế hoạch thu mua: điều khoản của bản đã ký nếu có, không thì bản đang soạn.
+   * Không kiểm quyền xem; nơi gọi chỉ được trả số liệu tổng hợp.
+   */
+  async effectiveTerms(c: Contract, exec: DbExecutor = this.db): Promise<ContractTerms> {
+    const version = c.signedVersion ?? c.currentVersion;
+    const [v] = await exec.select().from(contractVersions).where(and(eq(contractVersions.contractId, c.id), eq(contractVersions.version, version)));
+    return this.readTerms(v.contentEnc, this.dataKey(c));
+  }
+
   /** Ghi một sự kiện ngoài vòng đời hợp đồng (ví dụ nhà cung cấp đồng ý chia lô) vào sổ cái của hợp đồng. */
   async appendLedgerEvent(contractId: string, event: 'ncc_dong_y_chia_lo' | 'khieu_nai' | 'quyet_toan' | 'goi_eudr', contentHash: string, note: string, ctx: AuthContext, tx: DbExecutor) {
     const c = await this.findContract(contractId, tx);

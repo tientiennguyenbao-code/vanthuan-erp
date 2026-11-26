@@ -22,7 +22,7 @@ export default function NguonCung() {
   return (
     <KhungTrang toi={toi}>
       <h1>Nguồn cung</h1>
-      <p className="phu">Nông hộ, vùng trồng và thửa có tọa độ của từng nhà cung cấp. Đây là gốc để truy xuất nguồn gốc và lập hồ sơ EUDR cho cà phê xuất sang EU. Trần sản lượng của thửa tính theo <Link href="/nguon-cung/nang-suat">năng suất tối đa</Link>. Kết quả đối chiếu bản đồ rừng chờ duyệt ở trang <Link href="/nguon-cung/kiem-tra-rung">Kiểm tra rừng</Link>.</p>
+      <p className="phu">Nông hộ, vùng trồng và thửa có tọa độ của từng nhà cung cấp. Đây là gốc để truy xuất nguồn gốc và lập hồ sơ EUDR cho cà phê xuất sang EU. Trần sản lượng của thửa tính theo <Link href="/nguon-cung/nang-suat">năng suất tối đa</Link>. Kết quả đối chiếu bản đồ rừng chờ duyệt ở trang <Link href="/nguon-cung/kiem-tra-rung">Kiểm tra rừng</Link>. Cung so với cầu theo tháng ở trang <Link href="/nguon-cung/ke-hoach">Kế hoạch thu mua</Link>.</p>
       {loi && <div className="loi" role="alert">{loi}</div>}
       {ds && (
         <div className="luoi" style={{ margin: '12px 0' }}>

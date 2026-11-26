@@ -28,6 +28,7 @@ interface ChiTiet extends BaoGia {
   chiPhiGoiY: string[];
   tomTat: { giaTriBanUsd: number | null; giaVonUsd: number | null; chiPhiUsd: number | null; phiTronGoiUsd: number | null; bienUsd: number | null; bienPhanTram: number | null; thieu: string[] } | null;
   hopDong: { id: string; code: string; kind: string; status: string }[];
+  cungEudr: { conTrongKg: number; chaoKg: number; canhBao: string | null } | null;
   quyen: { sua: boolean; gui: boolean; suaDoi: boolean; tuChoi: boolean; chapNhan: boolean; huy: boolean };
 }
 
@@ -105,6 +106,12 @@ export default function ChiTietBaoGia() {
       {q.rejectReason && <div className="loi">{q.status === 'huy' ? 'Đã huỷ' : 'Bị từ chối'}: {q.rejectReason}</div>}
       {thongBao && <div className="dat" role="status">{thongBao}</div>}
       {loi && <div className="loi" role="alert">{loi}</div>}
+      {q.cungEudr && (
+        <div className={q.cungEudr.canhBao ? 'loi' : 'dat'} role="status">
+          {q.cungEudr.canhBao ?? `Cà phê đủ EUDR còn trống: ${(q.cungEudr.conTrongKg / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tấn, đủ cho báo giá này (${(q.cungEudr.chaoKg / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tấn).`}{' '}
+          <Link href="/nguon-cung/ke-hoach">Xem kế hoạch thu mua</Link>
+        </div>
+      )}
 
       <div className="luoi" style={{ marginTop: 16 }}>
         <div className="o">
@@ -115,7 +122,7 @@ export default function ChiTietBaoGia() {
         </div>
         <div className="o">
           <strong>Điều kiện</strong>
-          <div>Giao: {q.deliveryTime ?? '—'}</div>
+          <div>Giao: {q.deliveryTime ?? '—'}{q.deliveryMonth && ` · tháng ${Number(q.deliveryMonth.slice(5))}/${q.deliveryMonth.slice(0, 4)}`}</div>
           <div>Thanh toán: {q.paymentTerms ?? '—'}</div>
           {q.kind === 'mua' && <div>Chứng nhận: {q.certifications ?? '—'}</div>}
           <div className="phu" style={{ whiteSpace: 'pre-wrap' }}>{q.spec ?? ''}</div>

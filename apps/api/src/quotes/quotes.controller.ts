@@ -32,6 +32,11 @@ const quoteFields = {
   quyCach: optText(2000),
   chungNhan: optText(500),
   thoiGianGiao: optText(300),
+  thangGiao: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Tháng giao dạng YYYY-MM')
+    .nullish()
+    .transform((v) => v ?? null),
   thanhToan: optText(500),
   tyLePhiPhanTram: z.number().min(0).max(100).nullish(),
   ghiChu: optText(2000),
@@ -73,6 +78,7 @@ function toInput(b: z.infer<typeof updateSchema>) {
     spec: b.quyCach,
     certifications: b.chungNhan,
     deliveryTime: b.thoiGianGiao,
+    deliveryMonth: b.thangGiao,
     paymentTerms: b.thanhToan,
     feeRatePct: b.tyLePhiPhanTram ?? null,
     note: b.ghiChu,

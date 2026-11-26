@@ -134,6 +134,13 @@
       "when": 1795677567034,
       "tag": "0018_kiem_tra_rung_goi_eudr",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795678556353,
+      "tag": "0019_ke_hoach_thu_mua",
+      "breakpoints": true
     }
   ]
 }

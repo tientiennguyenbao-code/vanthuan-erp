@@ -37,7 +37,7 @@ GeoJSON xuất ra có `ProducerCountry`, `ProductionPlace`, `Area` cho mỗi th�
 
 ## Chưa làm (các bước sau)
 
-Phiếu thu gom và trần sản lượng (bước 2); kiểm tra phá rừng, duyệt 4 mắt, gói dữ liệu EUDR theo lô xuất (bước 3); kế hoạch thu mua (bước 4); nhập tệp KML.
+Truy xuất gia vị và thủy sản (bước 5); nối gói EUDR với dòng "Hồ sơ thẩm định EUDR" của checklist chứng từ; nhập tệp KML.
 
 ## Bước 2: phiếu thu gom, trần sản lượng, nhãn đủ EUDR
 
@@ -51,3 +51,13 @@ Phiếu thu gom và trần sản lượng (bước 2); kiểm tra phá rừng, d
 - **Kiểm tra rừng theo thửa**: nhân viên thu mua đối chiếu tọa độ thửa với bản đồ rừng 2020 (JRC, Global Forest Watch) hoặc khảo sát thực địa, ghi kết quả và căn cứ cho một hay nhiều thửa. Trưởng phòng KD hoặc Ban Giám đốc duyệt ở trang Nguồn cung → Kiểm tra rừng (quyền `NGUON_CUNG_DUYET_RUNG`); người ghi không tự duyệt. Đo lại tọa độ thì kết quả cũ hết hiệu lực, phải kiểm lại.
 - **Nhãn đủ EUDR** nay đòi thêm: thửa có kết quả "không rừng" đã duyệt.
 - **Gói dữ liệu EUDR** ở trang lô xuất đi EU: thửa, hộ (chỉ mã), vùng, diện tích, khối lượng, ngày thu hoạch, kết quả kiểm tra rừng. Chốt gói thì lưu thành một bản (không sửa được) và ghi mã băm lên sổ cái hợp đồng đối ứng. Tải GeoJSON của từng bản để gửi người nhập khẩu nộp DDS.
+
+## Bước 4: kế hoạch thu mua
+
+- **Sản lượng ước tính** theo thửa và tháng thu hoạch (bảng `harvest_estimates`): HTX khai trên cổng (mục Sản lượng dự kiến), nhân viên thu mua chỉnh ở hồ sơ nguồn cung. Chỉ khai từ tháng này đến 24 tháng tới; tổng trong 12 tháng liên tiếp không vượt trần của thửa. 0 kg là xoá. Mỗi lần đổi ghi nhật ký kèm số cũ.
+- **Kế hoạch thu mua** (Nguồn cung → Kế hoạch thu mua, quyền `NGUON_CUNG_XEM`), mỗi ngành một bảng 12 tháng:
+  - Cung = hàng đang có (lô mua chưa huỷ: đã thu gom − hao hụt − đã phân bổ) tính vào tháng đầu, cộng ước tính theo tháng (trừ phần đã thu gom từ thửa trong cùng tháng).
+  - Cầu = báo giá bán đã gửi còn hiệu lực (theo tháng giao dự kiến) và hợp đồng bán/mua bán trực tiếp chưa huỷ, chưa xếp tàu, trừ phần đã phân bổ (theo ETD của lô xuất, không có thì tháng giao của báo giá gốc). Chưa ghi tháng hoặc đã quá tháng thì tính vào tháng này.
+  - Thị trường: lô xuất đã lập thì theo lô; chưa thì theo nước của người mua (27 nước EU, Mỹ, Trung Quốc, khác).
+  - Cà phê: cầu đi EU chỉ dùng hàng đủ EUDR (lô mua nhãn đủ, ước tính từ thửa đang đủ điều kiện), nên có thêm cột "còn lại đủ EUDR". Số hợp đồng chỉ hiện với người có quyền xem mọi hợp đồng.
+- **Báo giá bán** có thêm ô tháng giao dự kiến. Báo giá cà phê sang EU (đang soạn hoặc đã gửi) hiện số hàng đủ EUDR còn trống và cảnh báo khi chào vượt; chỉ cảnh báo, không chặn.

@@ -5,6 +5,7 @@ import type { AuthContext } from '../auth/auth.types';
 import type { ContractKind, ContractTerms } from '../contracts/contract.rules';
 import { ContractsService } from '../contracts/contracts.service';
 import { DB, Db, DbExecutor } from '../db/db';
+import { PlanService } from '../sourcing/plan.service';
 import { commodities, contracts, partnerRoles, partners, Quote, quoteCostLines, quotes, users } from '../db/schema';
 import { costKindsFor, CostKind, isQuoteExpired, QuoteKind, QuoteStatus, quoteValue, saleSummary, toUsd, usdPerKg } from './quote.rules';
 
@@ -25,6 +26,8 @@ export interface QuoteInput {
   spec?: string | null;
   certifications?: string | null;
   deliveryTime?: string | null;
+  /** YYYY-MM */
+  deliveryMonth?: string | null;
   paymentTerms?: string | null;
   feeRatePct?: number | null;
   note?: string | null;
@@ -50,6 +53,7 @@ export class QuotesService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly contracts: ContractsService,
+    private readonly plan: PlanService,
   ) {}
 
   // ---------- Đọc ----------
@@ -63,7 +67,7 @@ export class QuotesService {
     if (filter.commodityId) conds.push(eq(quotes.commodityId, filter.commodityId));
     if (filter.q) conds.push(or(ilike(quotes.code, `%${filter.q}%`), ilike(partners.name, `%${filter.q}%`)));
     const rows = await this.db
-      .select({ q: quotes, partnerName: partners.name, commodityName: commodities.name, ownerName: users.fullName })
+      .select({ q: quotes, partnerName: partners.name, partnerCountry: partners.country, commodityName: commodities.name, sector: commodities.sector, ownerName: users.fullName })
       .from(quotes)
       .innerJoin(partners, eq(partners.id, quotes.partnerId))
       .innerJoin(commodities, eq(commodities.id, quotes.commodityId))
@@ -98,7 +102,7 @@ export class QuotesService {
 
   async get(id: string, ctx: AuthContext) {
     const [row] = await this.db
-      .select({ q: quotes, partnerName: partners.name, commodityName: commodities.name, ownerName: users.fullName })
+      .select({ q: quotes, partnerName: partners.name, partnerCountry: partners.country, commodityName: commodities.name, sector: commodities.sector, ownerName: users.fullName })
       .from(quotes)
       .innerJoin(partners, eq(partners.id, quotes.partnerId))
       .innerJoin(commodities, eq(commodities.id, quotes.commodityId))
@@ -135,6 +139,7 @@ export class QuotesService {
       chiPhi: costs.map((c) => ({ ...c, usd: toUsd(c.amount, c.currency, c.fxPerUsd) })),
       chiPhiGoiY: q.kind === 'ban' ? costKindsFor(q.incoterms).filter((k) => !costs.some((c) => c.kind === k)) : [],
       tomTat: q.kind === 'ban' ? saleSummary(q, sourceRow, costs) : null,
+      cungEudr: q.kind === 'ban' && (q.status === 'nhap' || q.status === 'da_gui') ? await this.plan.offerCheck(q, row.sector, row.partnerCountry) : null,
       hopDong: contractRows,
       quyen: {
         sua: editable && q.status === 'nhap',
@@ -307,6 +312,7 @@ export class QuotesService {
       spec: input.spec ?? null,
       certifications: input.certifications ?? null,
       deliveryTime: input.deliveryTime ?? null,
+      deliveryMonth: input.deliveryMonth ?? null,
       paymentTerms: input.paymentTerms ?? null,
       feeRatePct: input.feeRatePct ?? null,
       note: input.note ?? null,
@@ -376,6 +382,7 @@ export class QuotesService {
       fxPerUsd: q.fxPerUsd,
       incoterms: q.incoterms,
       portFrom: q.portFrom,
+      deliveryMonth: q.deliveryMonth,
       portTo: q.portTo,
       validUntil: q.validUntil,
       hetHieuLuc: isQuoteExpired(q.validUntil),
