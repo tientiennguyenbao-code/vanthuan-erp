@@ -17,7 +17,7 @@ export const UNITS = ['kg', 'tan'] as const;
 export type ContractStatus = 'nhap' | 'cho_ky' | 'da_ky' | 'da_huy';
 
 /** Loại sự kiện ghi vào sổ cái hợp đồng. */
-export type LedgerEvent = 'tao' | 'sua' | 'trinh_ky' | 'tra_lai' | 'ky' | 'phu_luc' | 'huy' | 'duyet_phi' | 'ncc_dong_y_chia_lo' | 'khieu_nai' | 'quyet_toan' | 'goi_eudr';
+export type LedgerEvent = 'tao' | 'sua' | 'trinh_ky' | 'tra_lai' | 'ky' | 'phu_luc' | 'huy' | 'duyet_phi' | 'ncc_dong_y_chia_lo' | 'khieu_nai' | 'quyet_toan' | 'goi_eudr' | 'chot_gia' | 'huy_chot_gia';
 
 export interface ContractTerms {
   soLuong: number;
@@ -35,6 +35,41 @@ export interface ContractTerms {
   /** Tỷ lệ phí trọn gói (%), đàm phán theo từng hợp đồng. */
   tyLePhiPhanTram?: number | null;
   ghiChu?: string | null;
+  /** Lịch giao chia đợt (BH-1): mỗi đợt thành một lô xuất. Trống = giao một lần. */
+  dotGiao?: DeliveryInstalment[] | null;
+  /** Người mua duyệt mẫu trước xuất; chưa có mẫu đạt thì chặn xếp tàu (BH-4). */
+  duyetMauTruocXuat?: boolean | null;
+  /** Giá trừ lùi cho cà phê (BH-2): giá = giá sàn kỳ hạn + chênh lệch; đơn giá trên hợp đồng là giá tạm tính. */
+  giaTruLui?: DifferentialPricing | null;
+}
+
+export interface DeliveryInstalment {
+  /** YYYY-MM */
+  thang: string;
+  /** Theo đơn vị của hợp đồng */
+  soLuong: number;
+}
+
+export const FUTURES_MARKETS = ['ICE_LONDON', 'ICE_NY'] as const;
+export interface DifferentialPricing {
+  /** ICE_LONDON: Robusta (USD/tấn); ICE_NY: Arabica (US cent/lb, quy ra USD/tấn khi nhập) */
+  san: (typeof FUTURES_MARKETS)[number];
+  /** Kỳ hạn tham chiếu YYYY-MM */
+  kyHan: string;
+  /** Chênh lệch cộng (trừ) vào giá sàn, USD/tấn */
+  chenhLech: number;
+}
+
+/** Lỗi của lịch giao chia đợt, nếu có. */
+export function instalmentProblems(t: Pick<ContractTerms, 'soLuong' | 'dotGiao'>): string[] {
+  const d = t.dotGiao ?? [];
+  if (!d.length) return [];
+  const out: string[] = [];
+  const sum = Math.round(d.reduce((a, x) => a + x.soLuong, 0) * 1000) / 1000;
+  if (Math.abs(sum - t.soLuong) > 0.0005) out.push(`Tổng các đợt giao (${sum}) phải bằng số lượng hợp đồng (${t.soLuong})`);
+  if (d.some((x) => !(x.soLuong > 0))) out.push('Mỗi đợt giao phải có số lượng lớn hơn 0');
+  for (let i = 1; i < d.length; i++) if (d[i].thang < d[i - 1].thang) { out.push('Các đợt giao phải xếp theo tháng tăng dần'); break; }
+  return out;
 }
 
 /** Vạn Thuận là một bên ở hợp đồng mua và bán; ở môi giới, hai bên là nhà cung cấp và người mua. */
@@ -102,6 +137,9 @@ export function readinessProblems(t: ContractTerms, kind?: ContractKind): string
   if (t.tienTe !== 'USD' && !(t.tyGiaUsd && t.tyGiaUsd > 0)) out.push('Hợp đồng không tính bằng USD cần tỷ giá quy đổi (chốt khi ký)');
   if (!t.lichGiao?.trim()) out.push('Thiếu lịch giao hàng');
   if (!t.dieuKhoanThanhToan?.trim()) out.push('Thiếu điều khoản thanh toán');
+  out.push(...instalmentProblems(t));
+  if (t.giaTruLui && t.tienTe !== 'USD') out.push('Hợp đồng giá trừ lùi phải tính bằng USD');
+  if (t.giaTruLui && t.donVi !== 'tan') out.push('Hợp đồng giá trừ lùi phải tính theo tấn');
   return out;
 }
 

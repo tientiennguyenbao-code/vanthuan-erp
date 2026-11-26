@@ -6,6 +6,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { ContractsService } from '../contracts/contracts.service';
+import { salesGateProblems } from '../sales/sales-gate';
 import { DB, Db, DbExecutor } from '../db/db';
 import {
   commodities,
@@ -267,10 +268,16 @@ export class DocumentsService {
 
   /** Chứng từ còn thiếu để sang "xếp tàu" (bỏ qua nếu Giám đốc đã mở chặn và chưa dùng). */
   async shippingProblems(lot: ExportLot, exec: DbExecutor): Promise<{ problems: string[]; overridden: boolean }> {
-    const rows = (await this.docRows(lot.id, exec)).filter((x) => !x.d.obsolete);
-    const problems = shippingDocProblems(rows.map((x) => this.toDocRow(x)), lot.etd, today());
+    const problems = await this.rawShippingProblems(lot, exec);
     const [ov] = await exec.select({ id: gateOverrides.id }).from(gateOverrides).where(and(eq(gateOverrides.exportLotId, lot.id), isNull(gateOverrides.usedAt))).limit(1);
     return { problems: ov ? [] : problems, overridden: !!ov && problems.length > 0 };
+  }
+
+  /** Thiếu chứng từ trước xếp tàu, cộng điều kiện bán hàng (mẫu trước xuất, chốt giá), chưa xét mở chặn. */
+  private async rawShippingProblems(lot: ExportLot, exec: DbExecutor): Promise<string[]> {
+    const rows = (await this.docRows(lot.id, exec)).filter((x) => !x.d.obsolete);
+    const counter = await this.contractsService.signedTerms(lot.counterContractId, exec);
+    return [...shippingDocProblems(rows.map((x) => this.toDocRow(x)), lot.etd, today()), ...(await salesGateProblems(lot, counter?.terms ?? null, exec))];
   }
 
   async completionProblems(lot: ExportLot, exec: DbExecutor): Promise<string[]> {
@@ -288,7 +295,7 @@ export class DocumentsService {
     const rows = await this.docRows(lotId, this.db);
     const active = rows.filter((x) => !x.d.obsolete);
     const ship = await this.shippingProblems(lot, this.db);
-    const raw = shippingDocProblems(active.map((x) => this.toDocRow(x)), lot.etd, today());
+    const raw = await this.rawShippingProblems(lot, this.db);
     const manage = this.canManageLot(lot, ctx) && lot.status !== 'da_huy' && lot.status !== 'hoan_tat';
     const approver = this.canApprove(ctx);
     const overrides = await this.db

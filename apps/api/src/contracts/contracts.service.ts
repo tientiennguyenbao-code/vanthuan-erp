@@ -256,6 +256,10 @@ export class ContractsService {
       const v = await this.currentVersion(c, tx);
       const terms = this.readTerms(v.contentEnc, this.dataKey(c));
       const problems = readinessProblems(terms, c.kind as ContractKind);
+      if (terms.giaTruLui) {
+        const [com] = await tx.select({ sector: commodities.sector }).from(commodities).where(eq(commodities.id, c.commodityId));
+        if (com?.sector !== 'ca_phe') problems.push('Giá trừ lùi chỉ dùng cho cà phê');
+      }
       if (problems.length) throw new BadRequestException(`Chưa trình ký được: ${problems.join('; ')}`);
       await this.assertPartiesUsable(c.kind as ContractKind, c.sellerPartnerId, c.buyerPartnerId, tx);
       const now = new Date();
@@ -376,7 +380,7 @@ export class ContractsService {
   }
 
   /** Ghi một sự kiện ngoài vòng đời hợp đồng (ví dụ nhà cung cấp đồng ý chia lô) vào sổ cái của hợp đồng. */
-  async appendLedgerEvent(contractId: string, event: 'ncc_dong_y_chia_lo' | 'khieu_nai' | 'quyet_toan' | 'goi_eudr', contentHash: string, note: string, ctx: AuthContext, tx: DbExecutor) {
+  async appendLedgerEvent(contractId: string, event: 'ncc_dong_y_chia_lo' | 'khieu_nai' | 'quyet_toan' | 'goi_eudr' | 'chot_gia' | 'huy_chot_gia', contentHash: string, note: string, ctx: AuthContext, tx: DbExecutor) {
     const c = await this.findContract(contractId, tx);
     await this.ledger.append({ contractId, version: c.signedVersion ?? c.currentVersion, event, actorUserId: ctx.user.id, contentHash, note }, tx);
   }

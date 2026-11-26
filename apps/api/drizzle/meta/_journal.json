@@ -169,6 +169,13 @@
       "when": 1795698307237,
       "tag": "0023_ban_hang_hoi_hang_mau",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795699235897,
+      "tag": "0024_hop_dong_nhieu_dot_chot_gia",
+      "breakpoints": true
     }
   ]
 }

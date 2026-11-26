@@ -19,3 +19,30 @@ Theo "Thiết kế phân hệ Bán hàng và Người mua" (Giám đốc chốt 
 ## Quyền
 
 Dùng chung quyền với báo giá: nhân viên kinh doanh thấy và sửa phiếu, mẫu của mình; Trưởng phòng KD, Ban Giám đốc, Kế toán trưởng xem tất cả (`HOP_DONG_XEM_TAT_CA`), Trưởng phòng sửa được tất cả (`HOP_DONG_SOAN_TAT_CA`).
+
+# Bước 2: hợp đồng nhiều đợt, giá trừ lùi, mẫu trước xuất
+
+## Hợp đồng bán giao nhiều đợt (BH-1)
+
+- Điều khoản hợp đồng bán (`ban`, `mua_ban_truc_tiep`) có thêm `dotGiao`: danh sách `{ thang: 'YYYY-MM', soLuong }`, tối đa 24 đợt. Tổng các đợt phải bằng số lượng hợp đồng, tháng tăng dần; nếu không thì không trình ký được.
+- Mỗi đợt một lô xuất: khi tạo lô xuất phải chọn đợt (`dot`). Lô xuất lưu `shipmentNo` và `plannedKg` (khối lượng của đợt). Dung sai của hợp đồng áp cho từng lô theo khối lượng đợt.
+- Hợp đồng giao một lần giữ nguyên cách cũ (một hợp đồng một lô xuất).
+- `GET /hop-dong/:id/thuc-hien`: tiến độ từng đợt (kế hoạch, lô xuất, đã phân bổ, đã giao khi lô đã xếp tàu, đã chốt giá) và tổng đã giao so với dung sai.
+- Kế hoạch thu mua tính cầu theo từng đợt, theo tháng của đợt.
+
+## Giá trừ lùi cà phê (BH-2)
+
+- `giaTruLui: { san: 'ICE_LONDON' | 'ICE_NY', kyHan: 'YYYY-MM', chenhLech }` (USD/tấn). Chỉ dùng cho cà phê, hợp đồng phải tính bằng USD và theo tấn. Đơn giá trong hợp đồng là giá tạm tính.
+- Chốt giá theo từng lô xuất (`/lo-xuat/:id/ban-hang/chot-gia`): mỗi lần ghi ngày, khối lượng, giá sàn. Sàn London tính USD/tấn; sàn New York nhập US cent/lb và quy ra USD/tấn (× 22,0462). Giá chốt = giá sàn + chênh lệch.
+- Không chốt vượt khối lượng của lô cộng dung sai; huỷ một lần chốt phải ghi lý do. Mỗi lần chốt và huỷ được ghi vào sổ cái của hợp đồng.
+- Khối lượng phải chốt = khối lượng đã phân bổ (chưa phân bổ thì lấy khối lượng đợt). Chưa chốt đủ thì chặn xếp tàu; còn dưới 10 ngày đến ETD mà chưa chốt hết thì hiện cảnh báo.
+- Giá trị lô (thu chi, quyết toán, khiếu nại) dùng giá bình quân gia quyền các lần chốt; chưa chốt thì tạm dùng đơn giá hợp đồng.
+
+## Mẫu trước xuất bắt buộc (BH-4)
+
+- Điều khoản `duyetMauTruocXuat: true`: lô xuất phải có một mẫu trước xuất "đạt" mới được xếp tàu.
+- Điều kiện bán hàng (mẫu, chốt giá) nằm chung danh sách "chưa đủ để xếp tàu" với chứng từ, nên Giám đốc mở chặn được như thiếu chứng từ.
+
+## Quyền
+
+Xem: người xem được lô (`LO_HANG_XEM_TAT_CA`), cấp quản lý bán hàng (`HOP_DONG_XEM_TAT_CA`) hoặc người phụ trách lô. Chốt giá và huỷ chốt: `LO_HANG_PHAN_CONG`, `HOP_DONG_SOAN_TAT_CA`, hoặc người phụ trách lô có quyền quản lý lô của mình.

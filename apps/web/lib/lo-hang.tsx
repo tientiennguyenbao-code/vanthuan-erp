@@ -29,6 +29,8 @@ export const SU_KIEN_LO: Record<string, string> = {
   thu_gom: 'Thu gom',
   huy_phieu: 'Huỷ phiếu thu gom',
   goi_eudr: 'Chốt gói EUDR',
+  chot_gia: 'Chốt giá',
+  huy_chot_gia: 'Huỷ chốt giá',
   so_che: 'Sơ chế',
   nhap_kho: 'Nhập kho',
   huy: 'Huỷ lô',

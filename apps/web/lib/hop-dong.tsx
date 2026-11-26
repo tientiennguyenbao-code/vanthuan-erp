@@ -18,6 +18,12 @@ export interface DieuKhoan {
   dieuKhoanThanhToan: string;
   tyLePhiPhanTram: number | null;
   ghiChu: string | null;
+  /** Hợp đồng bán giao nhiều đợt: mỗi đợt một lô xuất */
+  dotGiao?: { thang: string; soLuong: number }[] | null;
+  /** Người mua phải duyệt mẫu trước xuất mới được xếp tàu */
+  duyetMauTruocXuat?: boolean | null;
+  /** Cà phê bán theo giá trừ lùi: giá sàn kỳ hạn + chênh lệch (USD/tấn) */
+  giaTruLui?: { san: 'ICE_LONDON' | 'ICE_NY'; kyHan: string; chenhLech: number } | null;
 }
 
 export const DIEU_KHOAN_TRONG: DieuKhoan = {
@@ -43,7 +49,7 @@ function so(v: string): number {
 }
 
 /** Ô nhập điều khoản dùng chung cho soạn mới, sửa và lập phụ lục. */
-export function NhapDieuKhoan({ v, doi, matHangId, coPhi = true }: { v: DieuKhoan; doi: (v: DieuKhoan) => void; matHangId?: string; coPhi?: boolean }) {
+export function NhapDieuKhoan({ v, doi, matHangId, coPhi = true, coBan = false }: { v: DieuKhoan; doi: (v: DieuKhoan) => void; matHangId?: string; coPhi?: boolean; coBan?: boolean }) {
   const set = <K extends keyof DieuKhoan>(k: K, val: DieuKhoan[K]) => doi({ ...v, [k]: val });
   return (
     <>
@@ -83,7 +89,66 @@ export function NhapDieuKhoan({ v, doi, matHangId, coPhi = true }: { v: DieuKhoa
       <input id="tToan" value={v.dieuKhoanThanhToan} onChange={(e) => set('dieuKhoanThanhToan', e.target.value)} placeholder="VD: Đặt cọc 30%, còn lại theo chứng từ" />
       <label htmlFor="gc">Ghi chú, quy cách</label>
       <textarea id="gc" rows={3} value={v.ghiChu ?? ''} onChange={(e) => set('ghiChu', e.target.value || null)} />
+      {coBan && <DieuKhoanBan v={v} doi={doi} />}
     </>
+  );
+}
+
+/** Điều khoản riêng của hợp đồng bán: giao nhiều đợt, duyệt mẫu trước xuất, giá trừ lùi cà phê. */
+function DieuKhoanBan({ v, doi }: { v: DieuKhoan; doi: (v: DieuKhoan) => void }) {
+  const dots = v.dotGiao ?? [];
+  const tong = dots.reduce((a, d) => a + (d.soLuong || 0), 0);
+  const lech = dots.length > 0 && Math.abs(tong - v.soLuong) > 0.0005;
+  const setDot = (i: number, k: 'thang' | 'soLuong', val: string | number) => doi({ ...v, dotGiao: dots.map((d, j) => (j === i ? { ...d, [k]: val } : d)) });
+  const g = v.giaTruLui ?? null;
+  const dv = v.donVi === 'tan' ? 'tấn' : 'kg';
+  return (
+    <fieldset className="o" style={{ marginTop: 12 }}>
+      <legend><strong>Điều khoản bán hàng</strong></legend>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input type="checkbox" style={{ width: 'auto' }} checked={dots.length > 0} onChange={(e) => doi({ ...v, dotGiao: e.target.checked ? [{ thang: '', soLuong: v.soLuong / 2 }, { thang: '', soLuong: v.soLuong / 2 }] : null })} />
+        Giao nhiều đợt (mỗi đợt một lô xuất)
+      </label>
+      {dots.length > 0 && (
+        <>
+          {dots.map((d, i) => (
+            <div className="hang" key={i}>
+              <div><label htmlFor={`dt${i}`}>Đợt {i + 1}: tháng giao</label><input id={`dt${i}`} type="month" required value={d.thang} onChange={(e) => setDot(i, 'thang', e.target.value)} /></div>
+              <div><label htmlFor={`ds${i}`}>Số lượng ({dv})</label><input id={`ds${i}`} inputMode="decimal" required value={d.soLuong || ''} onChange={(e) => setDot(i, 'soLuong', so(e.target.value))} /></div>
+              {dots.length > 2 && <button type="button" className="phu-btn" onClick={() => doi({ ...v, dotGiao: dots.filter((_, j) => j !== i) })}>Bỏ đợt</button>}
+            </div>
+          ))}
+          <div className="hang" style={{ alignItems: 'center' }}>
+            {dots.length < 24 && <button type="button" className="phu-btn" onClick={() => doi({ ...v, dotGiao: [...dots, { thang: '', soLuong: 0 }] })}>Thêm đợt</button>}
+            <span className={lech ? 'kyc-canh-bao' : 'phu'}>Tổng các đợt {tong.toLocaleString('vi-VN')} {dv}{lech ? `, phải bằng ${v.soLuong.toLocaleString('vi-VN')} ${dv}` : ''}</span>
+          </div>
+        </>
+      )}
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+        <input type="checkbox" style={{ width: 'auto' }} checked={!!v.duyetMauTruocXuat} onChange={(e) => doi({ ...v, duyetMauTruocXuat: e.target.checked || null })} />
+        Người mua phải duyệt mẫu trước xuất (chưa có mẫu đạt thì không xếp tàu)
+      </label>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+        <input type="checkbox" style={{ width: 'auto' }} checked={!!g} onChange={(e) => doi({ ...v, giaTruLui: e.target.checked ? { san: 'ICE_LONDON', kyHan: '', chenhLech: 0 } : null })} />
+        Giá trừ lùi theo sàn kỳ hạn (chỉ cà phê; tính bằng USD/tấn)
+      </label>
+      {g && (
+        <>
+          <div className="hang">
+            <div>
+              <label htmlFor="san">Sàn</label>
+              <select id="san" value={g.san} onChange={(e) => doi({ ...v, giaTruLui: { ...g, san: e.target.value as 'ICE_LONDON' | 'ICE_NY' } })}>
+                <option value="ICE_LONDON">ICE London (Robusta)</option>
+                <option value="ICE_NY">ICE New York (Arabica)</option>
+              </select>
+            </div>
+            <div><label htmlFor="kh">Kỳ hạn tham chiếu</label><input id="kh" type="month" required value={g.kyHan} onChange={(e) => doi({ ...v, giaTruLui: { ...g, kyHan: e.target.value } })} /></div>
+            <div><label htmlFor="cl">Chênh lệch (USD/tấn, âm là trừ)</label><input id="cl" inputMode="decimal" value={g.chenhLech} onChange={(e) => doi({ ...v, giaTruLui: { ...g, chenhLech: Number(e.target.value.replace(',', '.')) || 0 } })} /></div>
+          </div>
+          <p className="phu" style={{ margin: '4px 0 0' }}>Đơn giá ở trên là giá tạm tính. Giá thật của từng lô là bình quân các lần chốt; phải chốt hết trước khi xếp tàu.</p>
+        </>
+      )}
+    </fieldset>
   );
 }
 

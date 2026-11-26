@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth, Public, RequirePermissions } from '../auth/decorators';
 import { parseBody } from '../common/validation';
-import { CONTRACT_KINDS, ContractTerms, CURRENCIES, INCOTERMS, UNITS } from './contract.rules';
+import { CONTRACT_KINDS, ContractTerms, CURRENCIES, FUTURES_MARKETS, INCOTERMS, UNITS } from './contract.rules';
 import { ContractsService } from './contracts.service';
 import { LedgerService } from './ledger.service';
 
@@ -31,12 +31,24 @@ const termsSchema = z
     dieuKhoanThanhToan: z.string().trim().max(1000),
     tyLePhiPhanTram: z.number().min(0).max(100).nullish(),
     ghiChu: optText(2000),
+    dotGiao: z
+      .array(z.object({ thang: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Tháng giao dạng YYYY-MM'), soLuong: z.number().positive().max(1e9) }))
+      .max(24, 'Tối đa 24 đợt')
+      .nullish(),
+    duyetMauTruocXuat: z.boolean().nullish(),
+    giaTruLui: z
+      .object({ san: z.enum(FUTURES_MARKETS), kyHan: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Kỳ hạn dạng YYYY-MM'), chenhLech: z.number().min(-10000).max(10000) })
+      .nullish(),
   })
   .transform(
     (t): ContractTerms => ({
       ...t,
       tyGiaUsd: t.tienTe === 'USD' ? null : (t.tyGiaUsd ?? null),
       tyLePhiPhanTram: t.tyLePhiPhanTram ?? null,
+      // Để trống thì bỏ hẳn khỏi nội dung, để hợp đồng không dùng các điều khoản này giữ nguyên như trước
+      dotGiao: t.dotGiao?.length ? t.dotGiao : undefined,
+      duyetMauTruocXuat: t.duyetMauTruocXuat ? true : undefined,
+      giaTruLui: t.giaTruLui ?? undefined,
     }),
   );
 

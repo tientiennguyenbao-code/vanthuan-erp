@@ -107,3 +107,119 @@ export function sampleResultProblem(status: string, kind: string, sector: string
   if (cupScore != null && (cupScore < 0 || cupScore > 100)) return 'Điểm thử nếm trong khoảng 0 đến 100';
   return null;
 }
+
+// ---------- Chốt giá trừ lùi, cổng xếp tàu của bán hàng ----------
+
+/** Số ngày trước ETD bắt đầu cảnh báo còn hàng chưa chốt giá (BH-2). */
+export const FIXING_WARNING_DAYS = 10;
+
+/** Giá chốt bình quân gia quyền (USD/tấn) của các lần chốt; null khi chưa chốt. */
+export function weightedFixedPrice(rows: { quantityKg: number; finalPrice: number }[]): number | null {
+  const kg = rows.reduce((a, r) => a + r.quantityKg, 0);
+  if (kg <= 0) return null;
+  return Math.round((rows.reduce((a, r) => a + r.quantityKg * r.finalPrice, 0) / kg) * 100) / 100;
+}
+
+/** Khối lượng cần chốt giá của lô: khối lượng đã phân bổ, chưa phân bổ thì lấy khối lượng của đợt. */
+export function kgToFix(allocatedKg: number, plannedKg: number): number {
+  return allocatedKg > 0 ? allocatedKg : plannedKg;
+}
+
+/** Lý do không ghi được một lần chốt giá. */
+export function fixationRefusal(input: { hasDifferential: boolean; lotStatus: string; quantityKg: number; fixedKg: number; maxKg: number }): string | null {
+  if (!input.hasDifferential) return 'Hợp đồng của lô không bán theo giá trừ lùi';
+  if (['xep_tau', 'hoan_tat', 'da_huy'].includes(input.lotStatus)) return 'Lô đã xếp tàu hoặc đã huỷ, không chốt giá thêm';
+  if (input.fixedKg + input.quantityKg > input.maxKg + 0.005) {
+    return `Chốt vượt khối lượng của lô: đã chốt ${Math.round(input.fixedKg)} kg, tối đa ${Math.round(input.maxKg)} kg`;
+  }
+  return null;
+}
+
+export interface SalesGateInput {
+  needsPreShipmentSample: boolean;
+  samples: { kind: string; status: string }[];
+  hasDifferential: boolean;
+  needFixKg: number;
+  fixedKg: number;
+}
+
+/** Điều kiện bán hàng trước khi xếp tàu: mẫu trước xuất đạt (BH-4) và đã chốt đủ giá (BH-2). */
+export function salesShippingProblems(g: SalesGateInput): string[] {
+  const out: string[] = [];
+  if (g.needsPreShipmentSample) {
+    const pre = g.samples.filter((s) => s.kind === 'truoc_xuat');
+    if (!pre.some((s) => s.status === 'dat')) {
+      out.push(pre.some((s) => s.status === 'khong_dat') ? 'Mẫu trước xuất bị người mua đánh giá không đạt' : 'Người mua chưa duyệt mẫu trước xuất');
+    }
+  }
+  if (g.hasDifferential && g.fixedKg < g.needFixKg - 0.5) {
+    out.push(`Còn ${(Math.round((g.needFixKg - g.fixedKg) / 10) / 100).toLocaleString('vi-VN')} tấn chưa chốt giá`);
+  }
+  return out;
+}
+
+/** Cảnh báo chốt giá: còn hàng chưa chốt và ETD trong vòng 10 ngày (hoặc đã qua). */
+export function fixingWarning(etd: string | null, unfixedKg: number, today: string = iso(new Date())): boolean {
+  if (!etd || unfixedKg <= 0.5) return false;
+  const days = Math.round((parse(etd).getTime() - parse(today).getTime()) / 864e5);
+  return days <= FIXING_WARNING_DAYS;
+}
+
+/** 1 US cent/lb = 22,0462 USD/tấn. */
+export const CENTS_LB_TO_USD_T = 22.0462;
+
+/** Giá sàn quy ra USD/tấn: sàn London niêm yết USD/tấn, sàn New York niêm yết US cent/lb. */
+export function futuresToUsdPerTon(market: string, price: number): number {
+  return Math.round((market === 'ICE_NY' ? price * CENTS_LB_TO_USD_T : price) * 100) / 100;
+}
+
+/** Giá chốt USD/tấn = giá sàn (quy USD/tấn) + chênh lệch. */
+export function fixedPrice(market: string, futuresPrice: number, differential: number): number {
+  return Math.round((futuresToUsdPerTon(market, futuresPrice) + differential) * 100) / 100;
+}
+
+export interface ProgressLot {
+  id: string;
+  code: string;
+  shipmentNo: number;
+  status: string;
+  allocatedKg: number;
+  fixedKg: number;
+  avgPrice: number | null;
+}
+
+/**
+ * Tiến độ giao của hợp đồng bán theo từng đợt (BH-1): mỗi đợt một lô xuất.
+ * Hàng tính là đã giao khi lô đã xếp tàu; tổng giao phải nằm trong dung sai của hợp đồng.
+ */
+export function deliveryProgress(plan: { thang: string | null; plannedKg: number }[], lots: ProgressLot[], tolerancePct: number) {
+  const shipped = (s: string) => s === 'xep_tau' || s === 'hoan_tat';
+  const rows = plan.map((p, i) => {
+    const lot = lots.find((l) => l.shipmentNo === i + 1 && l.status !== 'da_huy') ?? null;
+    return {
+      dot: i + 1,
+      thang: p.thang,
+      keHoachKg: p.plannedKg,
+      lo: lot ? { id: lot.id, code: lot.code, status: lot.status } : null,
+      phanBoKg: lot?.allocatedKg ?? 0,
+      daGiaoKg: lot && shipped(lot.status) ? lot.allocatedKg : 0,
+      daChotKg: lot?.fixedKg ?? 0,
+      giaBinhQuan: lot?.avgPrice ?? null,
+    };
+  });
+  const totalKg = plan.reduce((a, p) => a + p.plannedKg, 0);
+  const deliveredKg = rows.reduce((a, r) => a + r.daGiaoKg, 0);
+  const minKg = totalKg * (1 - tolerancePct / 100);
+  const maxKg = totalKg * (1 + tolerancePct / 100);
+  const r3 = (n: number) => Math.round(n * 1000) / 1000;
+  return {
+    dot: rows,
+    tongKg: r3(totalKg),
+    daGiaoKg: r3(deliveredKg),
+    conLaiKg: r3(Math.max(0, totalKg - deliveredKg)),
+    toiThieuKg: r3(minKg),
+    toiDaKg: r3(maxKg),
+    vuotDungSai: deliveredKg > maxKg + 0.5,
+    hoanThanh: rows.every((r) => r.lo && shipped(r.lo.status)) && deliveredKg >= minKg - 0.5,
+  };
+}

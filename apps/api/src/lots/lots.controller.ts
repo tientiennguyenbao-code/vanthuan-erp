@@ -41,7 +41,7 @@ const purchaseEvent = z.object({
   ghiChu: optText(1000),
 });
 const consentSchema = z.object({ soVanBan: z.string().trim().min(3, 'Ghi số hoặc tên văn bản đồng ý').max(300) });
-const exportCreate = z.object({ hopDongDoiUngId: z.uuid(), thiTruong: z.enum(MARKETS), etd: optDate, eta: optDate, nguoiPhuTrachId: z.uuid().nullish() });
+const exportCreate = z.object({ hopDongDoiUngId: z.uuid(), thiTruong: z.enum(MARKETS), etd: optDate, eta: optDate, nguoiPhuTrachId: z.uuid().nullish(), dot: z.number().int().min(1).max(24).nullish() });
 const exportUpdate = z.object({ etd: optDate, eta: optDate });
 const allocSchema = z.object({ loMuaId: z.uuid(), khoiLuongKg: kg });
 const inspectionSchema = z.object({ ketQua: z.enum(['dat', 'khong_dat']), donViGiamDinh: z.string().trim().min(2).max(200), soChungThu: optText(100), ghiChu: optText(1000) });
@@ -122,7 +122,7 @@ export class ExportLotsController {
   @Post()
   create(@Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
     const b = parseBody(exportCreate, body);
-    return this.lots.createExportLot({ contractId: b.hopDongDoiUngId, market: b.thiTruong, etd: b.etd, eta: b.eta, ownerUserId: b.nguoiPhuTrachId }, ctx);
+    return this.lots.createExportLot({ contractId: b.hopDongDoiUngId, market: b.thiTruong, etd: b.etd, eta: b.eta, ownerUserId: b.nguoiPhuTrachId, shipmentNo: b.dot ?? null }, ctx);
   }
 
   @Get(':id')
