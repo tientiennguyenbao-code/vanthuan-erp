@@ -17,7 +17,7 @@ export const UNITS = ['kg', 'tan'] as const;
 export type ContractStatus = 'nhap' | 'cho_ky' | 'da_ky' | 'da_huy';
 
 /** Loại sự kiện ghi vào sổ cái hợp đồng. */
-export type LedgerEvent = 'tao' | 'sua' | 'trinh_ky' | 'tra_lai' | 'ky' | 'phu_luc' | 'huy' | 'duyet_phi' | 'ncc_dong_y_chia_lo';
+export type LedgerEvent = 'tao' | 'sua' | 'trinh_ky' | 'tra_lai' | 'ky' | 'phu_luc' | 'huy' | 'duyet_phi' | 'ncc_dong_y_chia_lo' | 'khieu_nai' | 'quyet_toan';
 
 export interface ContractTerms {
   soLuong: number;
