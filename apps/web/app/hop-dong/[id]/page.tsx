@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { ThucHienHopDong } from '@/lib/ban-hang';
 import { DieuKhoan, NhanTrangThai, NhapDieuKhoan } from '@/lib/hop-dong';
+import { TRANG_THAI_LO_XUAT } from '@/lib/lo-hang';
 import { LOAI_HOP_DONG, ngayGio, SU_KIEN_SO_CAI, tien } from '@/lib/nhan';
 import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from '../../khung-trang';
@@ -136,6 +138,13 @@ export default function ChiTietHopDong() {
             <tr><th>Đơn giá</th><td>{tien(t.donGia, t.tienTe)} / {t.donVi === 'tan' ? 'tấn' : 'kg'}</td></tr>
             <tr><th>Incoterms, cảng</th><td>{t.incoterms}{t.cangDi && ` · đi ${t.cangDi}`}{t.cangDen && ` · đến ${t.cangDen}`}</td></tr>
             <tr><th>Lịch giao</th><td>{t.lichGiao || '—'}</td></tr>
+            {t.dotGiao && t.dotGiao.length > 0 && (
+              <tr><th>Giao theo đợt</th><td>{t.dotGiao.map((d, i) => <div key={i}>Đợt {i + 1}: tháng {d.thang.slice(5)}/{d.thang.slice(0, 4)}, {tien(d.soLuong)} {t.donVi === 'tan' ? 'tấn' : 'kg'}</div>)}</td></tr>
+            )}
+            {t.giaTruLui && (
+              <tr><th>Giá trừ lùi</th><td>Sàn {t.giaTruLui.san === 'ICE_NY' ? 'ICE New York' : 'ICE London'} kỳ hạn {t.giaTruLui.kyHan.slice(5)}/{t.giaTruLui.kyHan.slice(0, 4)}, chênh lệch {t.giaTruLui.chenhLech > 0 ? '+' : ''}{t.giaTruLui.chenhLech} USD/tấn. Đơn giá trên là giá tạm tính.</td></tr>
+            )}
+            {t.duyetMauTruocXuat && <tr><th>Mẫu trước xuất</th><td>Người mua duyệt mẫu trước khi xếp tàu</td></tr>}
             <tr><th>Thanh toán</th><td>{t.dieuKhoanThanhToan || '—'}</td></tr>
             <tr><th>Ghi chú, quy cách</th><td style={{ whiteSpace: 'pre-wrap' }}>{t.ghiChu || '—'}</td></tr>
             {phienBanHienTai.reason && <tr><th>Lý do phụ lục</th><td>{phienBanHienTai.reason}</td></tr>}
@@ -170,7 +179,7 @@ export default function ChiTietHopDong() {
               <input id="ldpl" required minLength={3} value={lyDo} onChange={(e) => setLyDo(e.target.value)} placeholder="VD: Giảm giá do giám định độ ẩm 13%" />
             </>
           )}
-          <NhapDieuKhoan v={dk} doi={setDk} matHangId={hd.commodityId} coPhi={hd.phi !== null} />
+          <NhapDieuKhoan v={dk} doi={setDk} matHangId={hd.commodityId} coPhi={hd.phi !== null} coBan={hd.kind === 'ban' || hd.kind === 'mua_ban_truc_tiep'} />
           <button style={{ marginTop: 16 }}>{mo === 'sua' ? 'Lưu điều khoản' : 'Tạo phụ lục'}</button>
         </form>
       )}
@@ -210,6 +219,8 @@ export default function ChiTietHopDong() {
           <button style={{ marginTop: 12 }}>{mo === 'traLai' ? 'Trả lại' : 'Xác nhận huỷ'}</button>
         </form>
       )}
+
+      {hd.signedVersion !== null && (hd.kind === 'ban' || hd.kind === 'mua_ban_truc_tiep') && <ThucHienHopDong hopDongId={hd.id} nhanTrangThaiLo={TRANG_THAI_LO_XUAT} />}
 
       <h2>Các phiên bản</h2>
       <div className="bang-cuon">

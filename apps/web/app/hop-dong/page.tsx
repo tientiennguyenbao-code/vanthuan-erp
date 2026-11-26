@@ -155,7 +155,7 @@ export default function DanhSachHopDong() {
             </div>
           </div>
           {(ncc.length === 0 || nguoiMua.length === 0) && <p className="phu">Danh sách chỉ hiện đối tác đã thẩm định đạt và còn hạn.</p>}
-          <NhapDieuKhoan v={dk} doi={setDk} matHangId={form.matHangId || undefined} coPhi={form.loai === 'mua' || form.loai === 'moi_gioi'} />
+          <NhapDieuKhoan v={dk} doi={setDk} matHangId={form.matHangId || undefined} coPhi={form.loai === 'mua' || form.loai === 'moi_gioi'} coBan={form.loai === 'ban' || form.loai === 'mua_ban_truc_tiep'} />
           <button style={{ marginTop: 16 }}>Tạo bản soạn</button>
         </form>
       )}

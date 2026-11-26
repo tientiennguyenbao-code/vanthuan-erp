@@ -5,6 +5,7 @@ import { CurrentAuth } from '../auth/decorators';
 import { parseBody } from '../common/validation';
 import { CURRENCIES, INCOTERMS, UNITS } from '../contracts/contract.rules';
 import { InquiriesService } from './inquiries.service';
+import { PriceFixingService } from './price-fixing.service';
 import { INQUIRY_SOURCES, LOST_REASONS, SAMPLE_KINDS } from './sales.rules';
 import { SamplesService } from './samples.service';
 
@@ -171,5 +172,48 @@ export class SamplesController {
   async cancel(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
     await this.samples.cancel(id, parseBody(reasonSchema, body).lyDo, ctx);
     return { ok: true };
+  }
+}
+
+const fixationSchema = z.object({
+  ngayChot: date,
+  soKg: z.number().positive('Khối lượng chốt phải lớn hơn 0').max(1e9),
+  giaSan: z.number().positive('Giá sàn phải lớn hơn 0').max(1e6),
+  nguoiYeuCau: z.enum(['nguoi_mua', 'van_thuan']).default('nguoi_mua'),
+  ghiChu: optText(500),
+});
+const voidSchema = z.object({ lyDo: z.string().trim().min(3, 'Ghi lý do').max(500) });
+
+/** Chốt giá trừ lùi và điều kiện bán hàng của một lô xuất. */
+@Controller('lo-xuat/:id/ban-hang')
+export class LotSalesController {
+  constructor(private readonly fixing: PriceFixingService) {}
+
+  @Get()
+  state(@Param('id', ParseUUIDPipe) id: string, @CurrentAuth() ctx: AuthContext) {
+    return this.fixing.state(id, ctx);
+  }
+
+  @Post('chot-gia')
+  record(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
+    const b = parseBody(fixationSchema, body);
+    return this.fixing.record(id, { fixedOn: b.ngayChot, quantityKg: b.soKg, futuresPrice: b.giaSan, requestedBy: b.nguoiYeuCau, note: b.ghiChu }, ctx);
+  }
+
+  @Post('chot-gia/:fid/huy')
+  @HttpCode(200)
+  async void(@Param('id', ParseUUIDPipe) id: string, @Param('fid', ParseUUIDPipe) fid: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
+    await this.fixing.void(id, fid, parseBody(voidSchema, body).lyDo, ctx);
+    return { ok: true };
+  }
+}
+
+@Controller('hop-dong/:id/thuc-hien')
+export class ContractProgressController {
+  constructor(private readonly fixing: PriceFixingService) {}
+
+  @Get()
+  async get(@Param('id', ParseUUIDPipe) id: string, @CurrentAuth() ctx: AuthContext) {
+    return { thucHien: await this.fixing.contractProgress(id, ctx) };
   }
 }

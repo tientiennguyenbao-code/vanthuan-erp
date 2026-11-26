@@ -3,7 +3,8 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { AuthContext } from '../auth/auth.types';
 import { ContractsService } from '../contracts/contracts.service';
 import { DB, Db, DbExecutor } from '../db/db';
-import { complaints, ExportLot, exportLots, feeRequests, financings, lotAllocations, lotEvents, lotPayments, partners, purchaseLots, settlements } from '../db/schema';
+import { complaints, ExportLot, exportLots, feeRequests, financings, lotAllocations, lotEvents, lotPayments, partners, priceFixations, purchaseLots, settlements } from '../db/schema';
+import { weightedFixedPrice } from '../sales/sales.rules';
 import { LotState, SettlementInput, toUsd } from './settlement.rules';
 
 export const today = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
@@ -87,7 +88,16 @@ export class LotFinanceService {
   async lotValues(lot: ExportLot, exec: DbExecutor = this.db) {
     const counter = await this.contracts.signedTerms(lot.counterContractId, exec);
     if (!counter) throw new BadRequestException('Hợp đồng đối ứng không còn hiệu lực');
-    const salePerKg = counter.terms.donGia / (counter.terms.donVi === 'tan' ? 1000 : 1);
+    let salePerKg = counter.terms.donGia / (counter.terms.donVi === 'tan' ? 1000 : 1);
+    if (counter.terms.giaTruLui) {
+      // Giá trừ lùi: dùng giá bình quân đã chốt (USD/tấn); chưa chốt thì tạm theo đơn giá dự kiến trong hợp đồng.
+      const fixes = await exec
+        .select({ quantityKg: priceFixations.quantityKg, finalPrice: priceFixations.finalPrice })
+        .from(priceFixations)
+        .where(and(eq(priceFixations.exportLotId, lot.id), isNull(priceFixations.voidedAt)));
+      const avg = weightedFixedPrice(fixes);
+      if (avg !== null) salePerKg = avg / 1000;
+    }
     const saleFx = counter.terms.tienTe === 'USD' ? 1 : (counter.terms.tyGiaUsd ?? null);
     const allocs = await exec
       .select({

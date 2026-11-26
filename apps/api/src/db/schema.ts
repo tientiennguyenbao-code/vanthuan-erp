@@ -541,6 +541,10 @@ export const exportLots = pgTable(
     eta: text('eta'),
     blNumber: text('bl_number'),
     shippedOn: text('shipped_on'),
+    /** Đợt giao của hợp đồng đối ứng (1 khi hợp đồng giao một lần) */
+    shipmentNo: integer('shipment_no').notNull().default(1),
+    /** Khối lượng của đợt (kg); trống = cả hợp đồng */
+    plannedKg: numeric('planned_kg', { precision: 14, scale: 3, mode: 'number' }),
     ownerUserId: uuid('owner_user_id')
       .notNull()
       .references(() => users.id),
@@ -551,7 +555,10 @@ export const exportLots = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('export_lots_code_uq').on(t.code), uniqueIndex('export_lots_counter_contract_uq').on(t.counterContractId)],
+  (t) => [
+    uniqueIndex('export_lots_code_uq').on(t.code),
+    uniqueIndex('export_lots_contract_shipment_uq').on(t.counterContractId, t.shipmentNo).where(sql`${t.status} <> 'da_huy'`),
+  ],
 );
 
 /**
@@ -1572,3 +1579,39 @@ export const samples = pgTable(
 );
 export type Inquiry = typeof inquiries.$inferSelect;
 export type Sample = typeof samples.$inferSelect;
+
+/**
+ * Chốt giá của lô xuất bán theo giá trừ lùi (cà phê): mỗi lần chốt một phần khối lượng theo giá sàn kỳ hạn
+ * lúc đó. Giá chốt = giá sàn + chênh lệch của hợp đồng. Phải chốt đủ khối lượng trước khi xếp tàu.
+ */
+export const priceFixations = pgTable(
+  'price_fixations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    contractId: uuid('contract_id')
+      .notNull()
+      .references(() => contracts.id),
+    fixedOn: text('fixed_on').notNull(),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 3, mode: 'number' }).notNull(),
+    /** Giá sàn kỳ hạn lúc chốt, USD/tấn */
+    futuresPrice: numeric('futures_price', { precision: 12, scale: 2, mode: 'number' }).notNull(),
+    differential: numeric('differential', { precision: 12, scale: 2, mode: 'number' }).notNull(),
+    /** Giá chốt USD/tấn = giá sàn + chênh lệch */
+    finalPrice: numeric('final_price', { precision: 12, scale: 2, mode: 'number' }).notNull(),
+    /** Ai yêu cầu chốt: nguoi_mua | van_thuan */
+    requestedBy: text('requested_by').notNull(),
+    note: text('note'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+  },
+  (t) => [index('price_fixations_lot_idx').on(t.exportLotId)],
+);
+export type PriceFixation = typeof priceFixations.$inferSelect;

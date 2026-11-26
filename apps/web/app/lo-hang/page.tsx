@@ -33,6 +33,7 @@ interface HopDongKhaDung {
   sellerName: string | null;
   buyerName: string | null;
   commodityName: string;
+  dotGiao: { dot: number; thang: string; soLuong: number; donVi: string }[];
 }
 
 export default function BangDieuPhoi() {
@@ -44,7 +45,7 @@ export default function BangDieuPhoi() {
   const [loi, setLoi] = useState('');
   const [moForm, setMoForm] = useState(false);
   const [hd, setHd] = useState<HopDongKhaDung[]>([]);
-  const [form, setForm] = useState({ hopDongDoiUngId: '', thiTruong: 'US', etd: '', eta: '' });
+  const [form, setForm] = useState({ hopDongDoiUngId: '', thiTruong: 'US', etd: '', eta: '', dot: '' });
   const coTheTao = !!toi && (toi.quyen.includes('LO_HANG_PHAN_CONG') || toi.quyen.includes('LO_HANG_QUAN_LY_CUA_MINH'));
 
   const tai = useCallback(async () => {
@@ -71,7 +72,7 @@ export default function BangDieuPhoi() {
     e.preventDefault();
     setLoi('');
     try {
-      const r = await api<{ id: string }>('/lo-xuat', { body: { ...form, etd: form.etd || null, eta: form.eta || null } });
+      const r = await api<{ id: string }>('/lo-xuat', { body: { ...form, etd: form.etd || null, eta: form.eta || null, dot: form.dot ? Number(form.dot) : null } });
       router.push(`/lo-hang/${r.id}`);
     } catch (err) {
       setLoi((err as Error).message);
@@ -116,11 +117,26 @@ export default function BangDieuPhoi() {
       {moForm && (
         <form className="o" style={{ marginTop: 12 }} onSubmit={tao}>
           <label htmlFor="hd">Hợp đồng đối ứng đã ký (hợp đồng bán, hoặc hợp đồng mua bán trực tiếp với môi giới)</label>
-          <select id="hd" required value={form.hopDongDoiUngId} onChange={(e) => setForm({ ...form, hopDongDoiUngId: e.target.value })}>
+          <select id="hd" required value={form.hopDongDoiUngId} onChange={(e) => {
+            const h = hd.find((x) => x.id === e.target.value);
+            setForm({ ...form, hopDongDoiUngId: e.target.value, dot: h?.dotGiao.length ? String(h.dotGiao[0].dot) : '' });
+          }}>
             <option value="">Chọn hợp đồng</option>
             {hd.map((h) => <option key={h.id} value={h.id}>{h.code} · {h.buyerName} · {h.commodityName}</option>)}
           </select>
-          {hd.length === 0 && <p className="phu">Chưa có hợp đồng đối ứng đã ký nào chưa có lô xuất.</p>}
+          {hd.length === 0 && <p className="phu">Chưa có hợp đồng đối ứng đã ký nào còn đợt chưa có lô xuất.</p>}
+          {(() => {
+            const dots = hd.find((x) => x.id === form.hopDongDoiUngId)?.dotGiao ?? [];
+            if (!dots.length) return null;
+            return (
+              <>
+                <label htmlFor="dot">Đợt giao (hợp đồng chia nhiều đợt, mỗi đợt một lô xuất)</label>
+                <select id="dot" required value={form.dot} onChange={(e) => setForm({ ...form, dot: e.target.value })}>
+                  {dots.map((d) => <option key={d.dot} value={d.dot}>Đợt {d.dot}: tháng {d.thang.slice(5)}/{d.thang.slice(0, 4)}, {d.soLuong.toLocaleString('vi-VN')} {d.donVi === 'tan' ? 'tấn' : 'kg'}</option>)}
+                </select>
+              </>
+            );
+          })()}
           <div className="hang">
             <div>
               <label htmlFor="thm">Thị trường đích</label>

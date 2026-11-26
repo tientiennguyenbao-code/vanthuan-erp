@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from './api';
 import { ngay } from './nhan';
 
@@ -162,6 +162,225 @@ export function BangMau({ ds, taiLai, coCot = true }: { ds: Mau[]; taiLai: () =>
           <div className="hang" style={{ marginTop: 12 }}><button>Lưu</button><button type="button" className="phu-btn" onClick={() => setMo(null)}>Đóng</button></div>
         </form>
       )}
+    </>
+  );
+}
+
+export const SAN_KY_HAN: Record<string, string> = { ICE_LONDON: 'ICE London (Robusta, USD/tấn)', ICE_NY: 'ICE New York (Arabica, US cent/lb)' };
+const tan = (kgv: number) => `${(kgv / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} tấn`;
+const usd = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} USD/tấn`);
+const thangVn = (t: string) => `${t.slice(5)}/${t.slice(0, 4)}`;
+
+interface LanChot {
+  id: string;
+  fixedOn: string;
+  quantityKg: number;
+  futuresPrice: number;
+  differential: number;
+  finalPrice: number;
+  requestedBy: string;
+  note: string | null;
+  createdByName: string;
+  voidedAt: string | null;
+  voidReason: string | null;
+}
+interface BanHangLoData {
+  dotGiao: { dot: number; tongSoDot: number } | null;
+  canMauTruocXuat: boolean;
+  mauTruocXuat: { code: string; status: string }[];
+  giaTruLui: {
+    san: string;
+    kyHan: string;
+    chenhLech: number;
+    canChotKg: number;
+    daChotKg: number;
+    toiDaKg: number;
+    conLaiKg: number;
+    giaBinhQuan: number | null;
+    canhBao: boolean;
+    lanChot: LanChot[];
+  } | null;
+  thieuBanHang: string[];
+  quyen: { chotGia: boolean };
+}
+
+/** Điều kiện bán hàng của lô xuất: đợt giao, mẫu trước xuất, chốt giá trừ lùi. */
+export function BanHangLo({ loId, onDoi }: { loId: string; onDoi?: () => void }) {
+  const [d, setD] = useState<BanHangLoData | null>(null);
+  const [loi, setLoi] = useState('');
+  const [tb, setTb] = useState('');
+  const [f, setF] = useState({ ngayChot: new Date().toISOString().slice(0, 10), soKg: '', giaSan: '', nguoiYeuCau: 'nguoi_mua', ghiChu: '' });
+  const [huy, setHuy] = useState<{ id: string; lyDo: string } | null>(null);
+  const tai = useCallback(() => api<BanHangLoData>(`/lo-xuat/${loId}/ban-hang`).then(setD), [loId]);
+  useEffect(() => {
+    tai().catch((e: Error) => setLoi(e.message));
+  }, [tai]);
+
+  async function lam(fn: () => Promise<unknown>, xong: string) {
+    setLoi('');
+    setTb('');
+    try {
+      await fn();
+      setTb(xong);
+      await tai();
+      onDoi?.();
+    } catch (e) {
+      setLoi((e as Error).message);
+    }
+  }
+  function chot(e: FormEvent) {
+    e.preventDefault();
+    const so = (v: string) => Number(v.replace(/\s/g, '').replace(/\./g, '').replace(',', '.'));
+    lam(
+      () => api(`/lo-xuat/${loId}/ban-hang/chot-gia`, { body: { ngayChot: f.ngayChot, soKg: so(f.soKg), giaSan: Number(f.giaSan.replace(',', '.')), nguoiYeuCau: f.nguoiYeuCau, ghiChu: f.ghiChu || null } }),
+      'Đã ghi lần chốt giá.',
+    ).then(() => setF((x) => ({ ...x, soKg: '', giaSan: '', ghiChu: '' })));
+  }
+
+  if (!d) return loi ? <div className="loi" role="alert">{loi}</div> : null;
+  if (!d.dotGiao && !d.canMauTruocXuat && !d.giaTruLui) return null;
+  const g = d.giaTruLui;
+  const ny = g?.san === 'ICE_NY';
+  return (
+    <div>
+      <h2>Bán hàng: đợt giao, mẫu, chốt giá</h2>
+      {tb && <div className="dat" role="status">{tb}</div>}
+      {loi && <div className="loi" role="alert">{loi}</div>}
+      <div className="luoi">
+        {d.dotGiao && (
+          <div className="o">
+            <strong>Đợt giao</strong>
+            <div>Đợt {d.dotGiao.dot} trong {d.dotGiao.tongSoDot} đợt của hợp đồng</div>
+          </div>
+        )}
+        {d.canMauTruocXuat && (
+          <div className="o">
+            <strong>Mẫu trước xuất</strong>
+            <div className="phu">Hợp đồng yêu cầu người mua duyệt mẫu trước khi xếp tàu.</div>
+            {d.mauTruocXuat.length === 0 ? (
+              <div className="kyc-canh-bao">Chưa gửi mẫu nào.</div>
+            ) : (
+              d.mauTruocXuat.map((m) => <div key={m.code}>{m.code}: <NhanMau s={m.status} /></div>)
+            )}
+            <Link href="/ban-hang/mau">Gửi mẫu, ghi kết quả</Link>
+          </div>
+        )}
+        {g && (
+          <div className="o">
+            <strong>Giá trừ lùi</strong>
+            <div>{SAN_KY_HAN[g.san]}, kỳ hạn {thangVn(g.kyHan)}</div>
+            <div>Chênh lệch {g.chenhLech > 0 ? '+' : ''}{g.chenhLech.toLocaleString('vi-VN')} USD/tấn</div>
+            <div>Đã chốt <strong>{tan(g.daChotKg)}</strong> trên {tan(g.canChotKg)} · còn {tan(g.conLaiKg)}</div>
+            <div>Giá bình quân đã chốt: <strong>{usd(g.giaBinhQuan)}</strong></div>
+            {g.canhBao && <div className="kyc-canh-bao">Còn dưới 10 ngày đến ngày tàu chạy mà chưa chốt hết giá.</div>}
+          </div>
+        )}
+      </div>
+      {d.thieuBanHang.length > 0 && (
+        <ul style={{ margin: '8px 0 0' }}>{d.thieuBanHang.map((t) => <li key={t} className="kyc-canh-bao">{t} (chặn xếp tàu)</li>)}</ul>
+      )}
+
+      {g && (
+        <>
+          <div className="bang-cuon" style={{ marginTop: 12 }}>
+            <table>
+              <thead><tr><th>Ngày chốt</th><th className="so">Khối lượng</th><th className="so">Giá sàn</th><th className="so">Chênh lệch</th><th className="so">Giá chốt</th><th>Ai yêu cầu</th><th>Người ghi</th><th></th></tr></thead>
+              <tbody>
+                {g.lanChot.length === 0 && <tr><td colSpan={8} className="phu">Chưa chốt lần nào.</td></tr>}
+                {g.lanChot.map((c) => (
+                  <tr key={c.id} style={c.voidedAt ? { opacity: 0.55 } : undefined}>
+                    <td>{ngay(c.fixedOn)}{c.voidedAt && <div className="kyc-canh-bao">Đã huỷ: {c.voidReason}</div>}{c.note && <div className="phu">{c.note}</div>}</td>
+                    <td className="so">{tan(c.quantityKg)}</td>
+                    <td className="so">{c.futuresPrice.toLocaleString('vi-VN')}{ny ? ' ¢/lb' : ''}</td>
+                    <td className="so">{c.differential.toLocaleString('vi-VN')}</td>
+                    <td className="so"><strong>{c.finalPrice.toLocaleString('vi-VN')}</strong></td>
+                    <td>{c.requestedBy === 'nguoi_mua' ? 'Người mua' : 'Vạn Thuận'}</td>
+                    <td>{c.createdByName}</td>
+                    <td>{d.quyen.chotGia && !c.voidedAt && <button className="phu-btn" onClick={() => setHuy({ id: c.id, lyDo: '' })}>Huỷ</button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {huy && (
+            <form className="o" style={{ marginTop: 8 }} onSubmit={(e) => { e.preventDefault(); lam(() => api(`/lo-xuat/${loId}/ban-hang/chot-gia/${huy.id}/huy`, { body: { lyDo: huy.lyDo } }), 'Đã huỷ lần chốt.').then(() => setHuy(null)); }}>
+              <label htmlFor="ldhuy">Lý do huỷ lần chốt</label>
+              <input id="ldhuy" required minLength={3} value={huy.lyDo} onChange={(e) => setHuy({ ...huy, lyDo: e.target.value })} />
+              <div className="hang"><button>Xác nhận huỷ</button><button type="button" className="phu-btn" onClick={() => setHuy(null)}>Thôi</button></div>
+            </form>
+          )}
+          {d.quyen.chotGia && g.conLaiKg > 0 && (
+            <form className="o" style={{ marginTop: 12 }} onSubmit={chot}>
+              <strong>Ghi một lần chốt giá</strong>
+              <p className="phu" style={{ margin: '4px 0 0' }}>Giá chốt = giá sàn {ny ? '(quy từ cent/lb ra USD/tấn)' : ''} + chênh lệch trong hợp đồng. Mỗi lần chốt được ghi vào sổ cái của hợp đồng.</p>
+              <div className="hang">
+                <div><label htmlFor="nc">Ngày chốt</label><input id="nc" type="date" required value={f.ngayChot} onChange={(e) => setF({ ...f, ngayChot: e.target.value })} /></div>
+                <div><label htmlFor="kgc">Khối lượng (kg)</label><input id="kgc" inputMode="decimal" required value={f.soKg} placeholder={String(g.conLaiKg)} onChange={(e) => setF({ ...f, soKg: e.target.value })} /></div>
+                <div><label htmlFor="gs">Giá sàn {ny ? '(US cent/lb)' : '(USD/tấn)'}</label><input id="gs" inputMode="decimal" required value={f.giaSan} onChange={(e) => setF({ ...f, giaSan: e.target.value })} /></div>
+                <div>
+                  <label htmlFor="ai">Ai yêu cầu chốt</label>
+                  <select id="ai" value={f.nguoiYeuCau} onChange={(e) => setF({ ...f, nguoiYeuCau: e.target.value })}><option value="nguoi_mua">Người mua</option><option value="van_thuan">Vạn Thuận</option></select>
+                </div>
+              </div>
+              <label htmlFor="gcc">Ghi chú</label>
+              <input id="gcc" value={f.ghiChu} onChange={(e) => setF({ ...f, ghiChu: e.target.value })} placeholder="VD: email người mua lúc 21:05" />
+              <button style={{ marginTop: 12 }}>Ghi lần chốt</button>
+            </form>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+interface ThucHien {
+  dot: { dot: number; thang: string | null; keHoachKg: number; lo: { id: string; code: string; status: string } | null; phanBoKg: number; daGiaoKg: number; daChotKg: number; giaBinhQuan: number | null }[];
+  tongKg: number;
+  daGiaoKg: number;
+  conLaiKg: number;
+  toiThieuKg: number;
+  toiDaKg: number;
+  vuotDungSai: boolean;
+  hoanThanh: boolean;
+  nhieuDot: boolean;
+  giaTruLui: { san: string; kyHan: string; chenhLech: number } | null;
+  canMauTruocXuat: boolean;
+}
+
+/** Tiến độ giao theo đợt của hợp đồng bán. */
+export function ThucHienHopDong({ hopDongId, nhanTrangThaiLo }: { hopDongId: string; nhanTrangThaiLo: Record<string, string> }) {
+  const [d, setD] = useState<ThucHien | null>(null);
+  useEffect(() => {
+    api<{ thucHien: ThucHien | null }>(`/hop-dong/${hopDongId}/thuc-hien`).then((r) => setD(r.thucHien)).catch(() => setD(null));
+  }, [hopDongId]);
+  if (!d) return null;
+  return (
+    <>
+      <h2>Thực hiện hợp đồng</h2>
+      <p>
+        Đã giao <strong>{tan(d.daGiaoKg)}</strong> trên {tan(d.tongKg)} · còn {tan(d.conLaiKg)}
+        <span className="phu"> (được giao từ {tan(d.toiThieuKg)} đến {tan(d.toiDaKg)})</span>
+        {d.hoanThanh && <span className="kyc-dat"> · Đã giao xong</span>}
+        {d.vuotDungSai && <span className="kyc-canh-bao"> · Giao vượt dung sai</span>}
+      </p>
+      <div className="bang-cuon">
+        <table>
+          <thead><tr><th>Đợt</th><th>Tháng</th><th className="so">Kế hoạch</th><th>Lô xuất</th><th className="so">Đã phân bổ</th><th className="so">Đã giao</th>{d.giaTruLui && <><th className="so">Đã chốt giá</th><th className="so">Giá bình quân</th></>}</tr></thead>
+          <tbody>
+            {d.dot.map((r) => (
+              <tr key={r.dot}>
+                <td>{r.dot}</td>
+                <td>{r.thang ? thangVn(r.thang) : '—'}</td>
+                <td className="so">{tan(r.keHoachKg)}</td>
+                <td>{r.lo ? <><Link href={`/lo-hang/${r.lo.id}`}>{r.lo.code}</Link> <span className="phu">{nhanTrangThaiLo[r.lo.status] ?? r.lo.status}</span></> : <span className="phu">Chưa lập</span>}</td>
+                <td className="so">{tan(r.phanBoKg)}</td>
+                <td className="so">{tan(r.daGiaoKg)}</td>
+                {d.giaTruLui && <><td className="so">{tan(r.daChotKg)}</td><td className="so">{usd(r.giaBinhQuan)}</td></>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

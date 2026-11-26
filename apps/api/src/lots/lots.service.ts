@@ -135,9 +135,25 @@ export class LotsService {
         ),
       )
       .orderBy(desc(contracts.createdAt));
+    // Hợp đồng chia đợt: còn đợt nào chưa có lô xuất thì vẫn lập được lô xuất cho đợt đó
+    const choLoXuat = [];
+    for (const r of rows.filter((x) => x.kind === 'ban' || x.kind === 'mua_ban_truc_tiep')) {
+      const t = await this.contractsService.signedTerms(r.id);
+      const dots = t?.terms.dotGiao ?? [];
+      if (!dots.length) {
+        if (!r.hasExportLot) choLoXuat.push({ ...r, dotGiao: [] as { dot: number; thang: string; soLuong: number; donVi: string }[] });
+        continue;
+      }
+      const used = await this.db
+        .select({ n: exportLots.shipmentNo })
+        .from(exportLots)
+        .where(and(eq(exportLots.counterContractId, r.id), sql`${exportLots.status} <> 'da_huy'`));
+      const free = dots.map((d, i) => ({ dot: i + 1, thang: d.thang, soLuong: d.soLuong, donVi: t!.terms.donVi })).filter((d) => !used.some((u) => u.n === d.dot));
+      if (free.length) choLoXuat.push({ ...r, dotGiao: free });
+    }
     return {
       choLoMua: rows.filter((r) => r.kind === 'mua' || r.kind === 'moi_gioi'),
-      choLoXuat: rows.filter((r) => (r.kind === 'ban' || r.kind === 'mua_ban_truc_tiep') && !r.hasExportLot),
+      choLoXuat,
     };
   }
 
@@ -389,15 +405,33 @@ export class LotsService {
 
   // ---------- Lô xuất ----------
 
-  async createExportLot(input: { contractId: string; market: Market; etd?: string | null; eta?: string | null; ownerUserId?: string | null }, ctx: AuthContext) {
+  async createExportLot(input: { contractId: string; market: Market; etd?: string | null; eta?: string | null; ownerUserId?: string | null; shipmentNo?: number | null }, ctx: AuthContext) {
     this.assertCanCreate(ctx);
     return this.db.transaction(async (tx) => {
       const { contract } = await this.signedContractFor(input.contractId, Object.values(COUNTER_CONTRACT_KIND), ctx, tx);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'export_lot_contract:' + contract.id}))`);
-      const [dup] = await tx.select({ code: exportLots.code }).from(exportLots).where(and(eq(exportLots.counterContractId, contract.id), sql`${exportLots.status} <> 'da_huy'`));
-      if (dup) throw new BadRequestException(`Hợp đồng ${contract.code} đã có lô xuất ${dup.code}`);
-      const [cancelled] = await tx.select({ id: exportLots.id }).from(exportLots).where(eq(exportLots.counterContractId, contract.id));
-      if (cancelled) throw new BadRequestException('Hợp đồng này từng có lô xuất đã huỷ; lập phụ lục hoặc hợp đồng mới');
+      const signed = await this.contractsService.signedTerms(contract.id, tx);
+      const instalments = signed?.terms.dotGiao ?? [];
+      let shipmentNo = 1;
+      let plannedKg: number | null = null;
+      if (instalments.length) {
+        // Hợp đồng giao nhiều đợt: mỗi đợt một lô xuất (BH-1)
+        if (!input.shipmentNo) throw new BadRequestException(`Hợp đồng ${contract.code} giao ${instalments.length} đợt: chọn đợt cho lô xuất`);
+        if (input.shipmentNo > instalments.length) throw new BadRequestException(`Hợp đồng ${contract.code} chỉ có ${instalments.length} đợt`);
+        shipmentNo = input.shipmentNo;
+        plannedKg = toKg(instalments[shipmentNo - 1].soLuong, signed!.terms.donVi);
+        const [dup] = await tx
+          .select({ code: exportLots.code })
+          .from(exportLots)
+          .where(and(eq(exportLots.counterContractId, contract.id), eq(exportLots.shipmentNo, shipmentNo), sql`${exportLots.status} <> 'da_huy'`));
+        if (dup) throw new BadRequestException(`Đợt ${shipmentNo} của hợp đồng ${contract.code} đã có lô xuất ${dup.code}`);
+      } else {
+        if (input.shipmentNo && input.shipmentNo !== 1) throw new BadRequestException(`Hợp đồng ${contract.code} giao một lần, không chia đợt`);
+        const [dup] = await tx.select({ code: exportLots.code }).from(exportLots).where(and(eq(exportLots.counterContractId, contract.id), sql`${exportLots.status} <> 'da_huy'`));
+        if (dup) throw new BadRequestException(`Hợp đồng ${contract.code} đã có lô xuất ${dup.code}`);
+        const [cancelled] = await tx.select({ id: exportLots.id }).from(exportLots).where(eq(exportLots.counterContractId, contract.id));
+        if (cancelled) throw new BadRequestException('Hợp đồng này từng có lô xuất đã huỷ; lập phụ lục hoặc hợp đồng mới');
+      }
       const owner = await this.resolveOwner(input.ownerUserId, ctx, tx);
       const code = await this.nextCode('LX', exportLots.code, exportLots, tx);
       const [lot] = await tx
@@ -411,11 +445,13 @@ export class LotsService {
           market: input.market,
           etd: input.etd ?? null,
           eta: input.eta ?? null,
+          shipmentNo,
+          plannedKg,
           ownerUserId: owner,
           createdBy: ctx.user.id,
         })
         .returning();
-      await this.event({ exportLotId: lot.id, kind: 'tao', note: `Từ hợp đồng ${contract.code}` }, ctx, tx);
+      await this.event({ exportLotId: lot.id, kind: 'tao', note: instalments.length ? `Từ hợp đồng ${contract.code}, đợt ${shipmentNo}/${instalments.length}` : `Từ hợp đồng ${contract.code}` }, ctx, tx);
       await this.documents.syncChecklist(lot, ctx, tx);
       await this.audit.record({ actorUserId: ctx.user.id, action: 'lo_xuat.tao', entityType: 'export_lot', entityId: lot.id, detail: { code, hopDong: contract.code } }, tx);
       return { id: lot.id, code };
@@ -753,7 +789,7 @@ export class LotsService {
       status: lot.status as ExportLotStatus,
       dealType: lot.dealType,
       commodityId: lot.commodityId,
-      contractKg: toKg(s.terms.soLuong, s.terms.donVi),
+      contractKg: lot.plannedKg ?? toKg(s.terms.soLuong, s.terms.donVi),
       tolerancePct: s.terms.dungSaiPhanTram ?? 0,
       allocations: views,
       lastInspection: (insp?.result as 'dat' | 'khong_dat' | undefined) ?? null,

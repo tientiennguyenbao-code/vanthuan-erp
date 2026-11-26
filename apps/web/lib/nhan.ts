@@ -65,6 +65,8 @@ export const SU_KIEN_SO_CAI: Record<string, string> = {
   khieu_nai: 'Đóng khiếu nại sau giao hàng',
   quyet_toan: 'Duyệt quyết toán lô',
   goi_eudr: 'Chốt gói dữ liệu EUDR',
+  chot_gia: 'Chốt giá trừ lùi',
+  huy_chot_gia: 'Huỷ một lần chốt giá',
 };
 
 export function tien(v: number | null | undefined, tienTe?: string): string {

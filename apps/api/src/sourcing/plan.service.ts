@@ -298,6 +298,7 @@ export class PlanService {
     const lots = await this.db
       .select({
         contractId: exportLots.counterContractId,
+        shipmentNo: exportLots.shipmentNo,
         market: exportLots.market,
         status: exportLots.status,
         etd: exportLots.etd,
@@ -305,7 +306,7 @@ export class PlanService {
       })
       .from(exportLots)
       .where(and(inArray(exportLots.counterContractId, ids), ne(exportLots.status, 'da_huy')));
-    const lotOf = new Map(lots.map((l) => [l.contractId, l]));
+    const lotOf = (contractId: string, dot: number) => lots.find((l) => l.contractId === contractId && l.shipmentNo === dot);
     const fromQuotes = await this.db
       .select({ ids: quotes.contractIds, month: quotes.deliveryMonth })
       .from(quotes)
@@ -314,16 +315,21 @@ export class PlanService {
     for (const fq of fromQuotes) for (const id of fq.ids as string[]) if (fq.month) quoteMonth.set(id, fq.month);
 
     for (const x of cs) {
-      const lot = lotOf.get(x.c.id);
-      if (lot && SHIPPED.includes(lot.status)) continue;
       const terms = await this.contracts.effectiveTerms(x.c);
-      const kg = toKg(terms.soLuong, terms.donVi) - (lot?.allocatedKg ?? 0);
-      if (kg <= 0.005) continue;
-      const written = lot?.etd ? lot.etd.slice(0, 7) : (quoteMonth.get(x.c.id) ?? null);
-      const m = bucketMonth(written, start);
-      if (!m) continue;
-      const market: PlanMarket = (lot?.market as PlanMarket | undefined) ?? marketOfCountry(x.country);
-      out.push({ id: x.c.id, ma: x.c.code, doiTac: x.partnerName ?? 'Chưa có người mua', market, month: m, thangGhi: written, kg, kind: x.c.status === 'da_ky' ? 'hop_dong_ky' : 'hop_dong_nhap' });
+      // Hợp đồng chia đợt: mỗi đợt là một dòng cầu theo tháng của đợt (BH-1)
+      const dots = terms.dotGiao?.length ? terms.dotGiao.map((d) => ({ qty: d.soLuong, month: d.thang as string | null })) : [{ qty: terms.soLuong, month: null }];
+      dots.forEach((d, i) => {
+        const lot = lotOf(x.c.id, i + 1);
+        if (lot && SHIPPED.includes(lot.status)) return;
+        const kg = toKg(d.qty, terms.donVi) - (lot?.allocatedKg ?? 0);
+        if (kg <= 0.005) return;
+        const written = lot?.etd ? lot.etd.slice(0, 7) : (d.month ?? quoteMonth.get(x.c.id) ?? null);
+        const m = bucketMonth(written, start);
+        if (!m) return;
+        const market: PlanMarket = (lot?.market as PlanMarket | undefined) ?? marketOfCountry(x.country);
+        const ma = dots.length > 1 ? `${x.c.code} đợt ${i + 1}/${dots.length}` : x.c.code;
+        out.push({ id: x.c.id, ma, doiTac: x.partnerName ?? 'Chưa có người mua', market, month: m, thangGhi: written, kg, kind: x.c.status === 'da_ky' ? 'hop_dong_ky' : 'hop_dong_nhap' });
+      });
     }
     return out;
   }

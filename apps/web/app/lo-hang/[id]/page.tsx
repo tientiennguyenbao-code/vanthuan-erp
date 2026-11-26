@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { BanHangLo } from '@/lib/ban-hang';
 import { ChecklistChungTu } from '@/lib/chung-tu';
 import { GoiEudrLo } from '@/lib/goi-eudr';
 import { TruyXuatLo } from '@/lib/truy-xuat';
@@ -318,6 +319,8 @@ export default function ChiTietLoXuat() {
         </details>
       )}
 
+      {lo.status !== 'da_huy' && <BanHangLo loId={lo.id} onDoi={() => tai().catch((e: Error) => setLoi(e.message))} />}
+
       {lo.status !== 'da_huy' && (
         <>
           <h2>Truy xuất nguồn gốc</h2>
@@ -362,3 +365,4 @@ export default function ChiTietLoXuat() {
     </KhungTrang>
   );
 }
+
