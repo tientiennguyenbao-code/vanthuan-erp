@@ -541,6 +541,7 @@ export class DocumentsService {
         supplierName: partners.name,
         feeContractCode: contracts.code,
         approvedByName: sql<string | null>`(select full_name from users u where u.id = ${feeRequests.approvedBy})`,
+        misaExportCode: sql<string | null>`(select code from misa_exports m where m.id = ${feeRequests.misaExportId})`,
       })
       .from(feeRequests)
       .innerJoin(exportLots, eq(exportLots.id, feeRequests.exportLotId))
@@ -563,6 +564,7 @@ export class DocumentsService {
       supplierName: x.supplierName,
       feeContractCode: x.feeContractCode,
       approvedByName: x.approvedByName,
+      misaExportCode: x.misaExportCode,
       amountUsd: x.f.amount !== null && x.f.fxPerUsd ? Math.round((x.f.amount / x.f.fxPerUsd) * 100) / 100 : null,
       coTheDuyet: canApprove && x.f.status === 'cho_duyet',
     }));
