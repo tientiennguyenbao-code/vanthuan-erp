@@ -32,6 +32,7 @@ export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactN
           {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong/vung-trong">Vùng trồng</Link>}
           {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong/thu-gom">Thu gom</Link>}
           {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong/uoc-tinh">Sản lượng dự kiến</Link>}
+          {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong/nhat-ky-thuoc">Nhật ký thuốc</Link>}
         </nav>
         <div>
           <span className="phu">{toi.hoTen}</span>{' '}

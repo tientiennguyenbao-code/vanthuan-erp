@@ -4,7 +4,8 @@ import { ContractsModule } from '../contracts/contracts.module';
 import { FILE_STORE, LocalFileStore } from '../documents/file-store';
 import { DocRulesController, DocumentsController, FeeRequestsController, FilesController, LotDocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
-import { EudrController } from './eudr.controller';
+import { EudrController, TraceController } from './eudr.controller';
+import { TraceService } from './trace.service';
 import { EudrService } from './eudr.service';
 import { AllocationsController, ExportLotsController, PurchaseLotsController } from './lots.controller';
 import { LotsService } from './lots.service';
@@ -15,7 +16,7 @@ import { PortalService } from './portal.service';
 
 @Module({
   imports: [AuditModule, ContractsModule],
-  controllers: [PurchaseLotsController, ExportLotsController, AllocationsController, LotDocumentsController, DocumentsController, DocRulesController, FeeRequestsController, FilesController, PortalController, PartnerPortalAccountsController, MisaController, EudrController],
-  providers: [LotsService, EudrService, DocumentsService, PortalService, MisaService, { provide: FILE_STORE, useClass: LocalFileStore }],
+  controllers: [PurchaseLotsController, ExportLotsController, AllocationsController, LotDocumentsController, DocumentsController, DocRulesController, FeeRequestsController, FilesController, PortalController, PartnerPortalAccountsController, MisaController, EudrController, TraceController],
+  providers: [LotsService, EudrService, TraceService, DocumentsService, PortalService, MisaService, { provide: FILE_STORE, useClass: LocalFileStore }],
 })
 export class LotsModule {}

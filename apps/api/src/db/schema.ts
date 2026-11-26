@@ -1187,6 +1187,8 @@ export const collectionSlips = pgTable(
     eudrReasons: jsonb('eudr_reasons').notNull().default([]),
     /** Trần sản lượng của thửa lúc ghi phiếu (kg trong 12 tháng); null khi chưa có mức năng suất */
     capKg: numeric('cap_kg', { precision: 14, scale: 2, mode: 'number' }),
+    /** Lưu ý truy xuất ngoài EUDR (ví dụ gia vị thu hoạch khi chưa hết thời gian cách ly thuốc BVTV); không chặn */
+    traceIssues: jsonb('trace_issues').notNull().default([]),
     /** noi_bo | cong_ncc */
     source: text('source').notNull(),
     note: text('note'),
@@ -1284,3 +1286,63 @@ export const harvestEstimates = pgTable(
   (t) => [uniqueIndex('harvest_estimates_plot_month_uq').on(t.plotId, t.month), index('harvest_estimates_month_idx').on(t.month)],
 );
 export type HarvestEstimate = typeof harvestEstimates.$inferSelect;
+
+/**
+ * Mã đăng ký của kho, xưởng với cơ quan nước nhập: FDA (Mỹ), GACC (Trung Quốc), danh sách cơ sở được xuất vào EU.
+ * Huỷ thay vì xoá.
+ */
+export const facilityCodes = pgTable(
+  'facility_codes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    /** fda | gacc | eu_list */
+    scheme: text('scheme').notNull(),
+    code: text('code').notNull(),
+    /** YYYY-MM-DD; trống là không ghi hạn */
+    validUntil: text('valid_until'),
+    note: text('note'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+  },
+  (t) => [index('facility_codes_facility_idx').on(t.facilityId)],
+);
+
+/**
+ * Nhật ký dùng thuốc bảo vệ thực vật theo thửa (gia vị): để đối chiếu dư lượng tối đa (MRL) và kiểm thu hoạch
+ * sau thời gian cách ly. Huỷ thay vì xoá.
+ */
+export const sprayLogs = pgTable(
+  'spray_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    plotId: uuid('plot_id')
+      .notNull()
+      .references(() => plots.id),
+    sprayedOn: text('sprayed_on').notNull(),
+    product: text('product').notNull(),
+    activeIngredient: text('active_ingredient'),
+    /** Thời gian cách ly ghi trên nhãn thuốc (ngày) */
+    phiDays: integer('phi_days').notNull(),
+    dose: text('dose'),
+    note: text('note'),
+    /** noi_bo | cong_ncc */
+    source: text('source').notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+  },
+  (t) => [index('spray_logs_plot_idx').on(t.plotId, t.sprayedOn)],
+);
+export type SprayLog = typeof sprayLogs.$inferSelect;

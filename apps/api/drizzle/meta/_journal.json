@@ -141,6 +141,13 @@
       "when": 1795678556353,
       "tag": "0019_ke_hoach_thu_mua",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795679572313,
+      "tag": "0020_truy_xuat_gia_vi_thuy_san",
+      "breakpoints": true
     }
   ]
 }

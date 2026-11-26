@@ -8,7 +8,7 @@ import { ha, TRANG_THAI_RUNG } from './nguon-cung';
 
 export interface PhieuThuGom {
   id: string; code: string; farmerName: string; farmerCode: string; plotCode: string; harvestDate: string; quantityKg: number;
-  moisturePct: number | null; weighTicketNo: string | null; eudrOk: boolean | null; eudrReasons: string[]; capKg: number | null;
+  moisturePct: number | null; weighTicketNo: string | null; eudrOk: boolean | null; eudrReasons: string[]; capKg: number | null; luuY: string[];
   source: string; note: string | null; createdByName: string; createdAt: string; voidedAt: string | null; voidReason: string | null;
 }
 export interface ThuaChon {
@@ -66,7 +66,7 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
   function gui(e: FormEvent) {
     e.preventDefault();
     lam(async () => {
-      const r = await api<{ code: string; eudrOk: boolean | null; eudrReasons: string[] }>(duong, {
+      const r = await api<{ code: string; eudrOk: boolean | null; eudrReasons: string[]; luuY: string[] }>(duong, {
         body: {
           farmerId: f.farmerId,
           plotId: f.plotId,
@@ -79,6 +79,7 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
       });
       setF({ ...f, plotId: '', quantityKg: '', moisturePct: '', weighTicketNo: '', note: '' });
       if (r.eudrOk === false) return `Đã ghi phiếu ${r.code}. Hàng chưa đủ EUDR: ${r.eudrReasons.join('; ')}.`;
+      if (r.luuY.length) return `Đã ghi phiếu ${r.code}. Lưu ý: ${r.luuY.join('; ')}.`;
       return `Đã ghi phiếu ${r.code}.`;
     });
   }
@@ -169,7 +170,7 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
                 <td>{p.farmerName}<div className="phu">{p.farmerCode}</div></td>
                 <td>{p.plotCode}</td>
                 <td>{ngay(p.harvestDate)}</td>
-                <td>{kg(p.quantityKg)}{p.moisturePct !== null && <div className="phu">ẩm {p.moisturePct}%</div>}</td>
+                <td>{kg(p.quantityKg)}{p.moisturePct !== null && <div className="phu">ẩm {p.moisturePct}%</div>}{p.luuY.map((x) => <div key={x} className="canh-bao-nhe">{x}</div>)}</td>
                 {d.lo.apDungEudr && (
                   <td>{p.eudrOk ? <span className="kyc-dat">Đủ</span> : <span className="canh-bao-nhe" title={p.eudrReasons.join('; ')}>Chưa đủ</span>}
                     {!p.eudrOk && <div className="phu">{p.eudrReasons.join('; ')}</div>}</td>

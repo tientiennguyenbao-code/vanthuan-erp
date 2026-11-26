@@ -37,7 +37,7 @@ GeoJSON xuất ra có `ProducerCountry`, `ProductionPlace`, `Area` cho mỗi th�
 
 ## Chưa làm (các bước sau)
 
-Truy xuất gia vị và thủy sản (bước 5); nối gói EUDR với dòng "Hồ sơ thẩm định EUDR" của checklist chứng từ; nhập tệp KML.
+Bước 5b: thủy sản khai thác (giấy khai thác IUU theo tàu, chuyến; phiếu thu gom từ chuyến khai thác) và dữ liệu SIMP đầy đủ cho người nhập Mỹ; nối gói EUDR với dòng "Hồ sơ thẩm định EUDR" của checklist chứng từ; nhập tệp KML.
 
 ## Bước 2: phiếu thu gom, trần sản lượng, nhãn đủ EUDR
 
@@ -61,3 +61,19 @@ Truy xuất gia vị và thủy sản (bước 5); nối gói EUDR với dòng "
   - Thị trường: lô xuất đã lập thì theo lô; chưa thì theo nước của người mua (27 nước EU, Mỹ, Trung Quốc, khác).
   - Cà phê: cầu đi EU chỉ dùng hàng đủ EUDR (lô mua nhãn đủ, ước tính từ thửa đang đủ điều kiện), nên có thêm cột "còn lại đủ EUDR". Số hợp đồng chỉ hiện với người có quyền xem mọi hợp đồng.
 - **Báo giá bán** có thêm ô tháng giao dự kiến. Báo giá cà phê sang EU (đang soạn hoặc đã gửi) hiện số hàng đủ EUDR còn trống và cảnh báo khi chào vượt; chỉ cảnh báo, không chặn.
+
+## Bước 5a: truy xuất gia vị và thủy sản nuôi
+
+- **Mã đăng ký của kho, xưởng** (bảng `facility_codes`, Danh mục → Kho và xưởng sơ chế): mã FDA (Mỹ), GACC (Trung Quốc), danh sách cơ sở được xuất vào EU, kèm hạn hiệu lực. Mỗi cơ sở một mã còn dùng cho mỗi loại; đổi mã thì huỷ mã cũ có lý do. Quyền `DANH_MUC_QUAN_LY`.
+- **Nhật ký thuốc BVTV** (bảng `spray_logs`) theo thửa gia vị: HTX ghi trên cổng (mục Nhật ký thuốc), nhân viên thu mua ghi ở hồ sơ nguồn cung. Không ghi ngày tương lai. HTX chỉ huỷ được dòng do cổng ghi.
+- **Phiếu thu gom gia vị** ghi lưu ý (`trace_issues`) khi ngày thu hoạch còn trong thời gian cách ly của một lần phun chưa huỷ. Chỉ ghi lưu ý, không chặn.
+- **Truy xuất lô xuất** (`GET /api/lo-xuat/:id/truy-xuat`, mục Truy xuất nguồn gốc ở trang lô): lô xuất → lô mua → phiếu → thửa/ao. Khi lô mua chia cho nhiều lô xuất, kg của từng thửa chia theo tỷ lệ kg phân bổ / kg lô mua đã thu gom. Cơ sở xử lý hàng lấy từ xưởng của lô mua và sự kiện có cơ sở.
+- **Kiểm theo ngành × thị trường** (`apps/api/src/sourcing/trace.rules.ts`):
+
+| Ngành | EU | Mỹ | Trung Quốc |
+|---|---|---|---|
+| Cà phê | truy tới thửa, đủ EUDR | mã FDA | mã GACC |
+| Gia vị | truy tới thửa, nhật ký thuốc và cách ly | mã FDA | mã GACC, mã số vùng trồng |
+| Thủy sản | truy tới ao, mã cơ sở nuôi, danh sách EU | mã FDA, SIMP | mã GACC, mã cơ sở nuôi |
+
+  Các điểm về quy định nước nhập (trừ truy nguồn và EUDR) là hiểu biết chung, chưa đối chiếu văn bản gốc, nên màn hình ghi "quy định cần xác minh". Loài SIMP nhận theo tên mặt hàng hoặc loài nuôi.
