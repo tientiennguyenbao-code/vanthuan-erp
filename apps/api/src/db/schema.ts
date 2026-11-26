@@ -1126,6 +1126,11 @@ export const plots = pgTable(
     landDocNumber: text('land_doc_number'),
     /** Cảnh báo lúc ghi (chồng lấn thửa khác, diện tích lệch) để nhân viên kiểm tra */
     warnings: jsonb('warnings').notNull().default([]),
+    /**
+     * Kết quả kiểm tra rừng (mốc 31/12/2020) đã được duyệt: chua_kiem | cho_duyet | khong_rung | co_rung.
+     * Đo lại tọa độ thì trở về chua_kiem.
+     */
+    forestStatus: text('forest_status').notNull().default('chua_kiem'),
     /** noi_bo | cong_ncc | nhap_tep */
     source: text('source').notNull(),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
@@ -1199,3 +1204,55 @@ export const collectionSlips = pgTable(
 );
 
 export type CollectionSlip = typeof collectionSlips.$inferSelect;
+
+/**
+ * Kiểm tra rừng của một thửa: người kiểm ghi kết quả (đối chiếu bản đồ rừng 2020 hoặc khảo sát thực địa),
+ * người thứ hai duyệt. Giữ mã băm tọa độ lúc kiểm để biết thửa có bị đo lại sau đó không.
+ */
+export const plotForestChecks = pgTable(
+  'plot_forest_checks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    plotId: uuid('plot_id')
+      .notNull()
+      .references(() => plots.id),
+    /** jrc_2020 | gfw | khao_sat | khac */
+    method: text('method').notNull(),
+    /** khong_rung | co_rung */
+    result: text('result').notNull(),
+    evidence: text('evidence').notNull(),
+    geometryHash: text('geometry_hash').notNull(),
+    checkedBy: uuid('checked_by')
+      .notNull()
+      .references(() => users.id),
+    checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+    /** cho_duyet | da_duyet | tu_choi | het_hieu_luc */
+    status: text('status').notNull().default('cho_duyet'),
+    reviewedBy: uuid('reviewed_by').references(() => users.id),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewNote: text('review_note'),
+  },
+  (t) => [index('plot_forest_checks_plot_idx').on(t.plotId), index('plot_forest_checks_status_idx').on(t.status)],
+);
+
+/**
+ * Gói dữ liệu EUDR của một lô xuất: danh sách thửa (tọa độ), khối lượng, kết quả kiểm tra rừng.
+ * Mỗi lần chốt là một phiên bản; mã băm nội dung được ghi lên sổ cái của hợp đồng đối ứng. Chỉ ghi thêm.
+ */
+export const eudrPackages = pgTable(
+  'eudr_packages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    version: integer('version').notNull(),
+    content: jsonb('content').notNull(),
+    contentHash: text('content_hash').notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('eudr_packages_lot_version_uq').on(t.exportLotId, t.version)],
+);

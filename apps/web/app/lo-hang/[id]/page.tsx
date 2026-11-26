@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ChecklistChungTu } from '@/lib/chung-tu';
+import { GoiEudrLo } from '@/lib/goi-eudr';
 import { KhieuNaiLo, QuyetToanLo, ThuChiLo } from '@/lib/thanh-toan';
 import { CacBuoc, Den, kg, LOAI_GIAO_DICH, NhatKy, SuKienLo, THI_TRUONG, TRANG_THAI_LO_XUAT } from '@/lib/lo-hang';
 import { ngay, ngayGio } from '@/lib/nhan';
@@ -314,6 +315,13 @@ export default function ChiTietLoXuat() {
             <button className="phu-btn" style={{ marginTop: 12 }}>Xác nhận huỷ</button>
           </form>
         </details>
+      )}
+
+      {lo.market === 'EU' && lo.status !== 'da_huy' && (
+        <>
+          <h2>Gói dữ liệu EUDR</h2>
+          <GoiEudrLo loId={lo.id} />
+        </>
       )}
 
       {lo.status !== 'da_huy' && (

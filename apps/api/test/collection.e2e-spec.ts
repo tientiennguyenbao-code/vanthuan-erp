@@ -120,6 +120,10 @@ describe('Phiếu thu gom, trần sản lượng, nhãn đủ EUDR', () => {
   });
 
   it('phiếu đủ EUDR cộng vào lô và định nhãn lô; không vượt trần của thửa', async () => {
+    // Kiểm tra rừng cho thửa A và B; người kiểm không tự duyệt
+    const kt = await tm.post('/api/kiem-tra-rung').send({ plotIds: [ids.thuaA, ids.thuaB], method: 'jrc_2020', result: 'khong_rung', evidence: 'Đối chiếu bản đồ JRC GFC2020' }).expect(201);
+    await tm.post('/api/kiem-tra-rung/duyet').send({ ids: kt.body.ids, dongY: true }).expect(403);
+    await gd.post('/api/kiem-tra-rung/duyet').send({ ids: kt.body.ids, dongY: true }).expect(200);
     const r = await tm.post(`/api/lo-mua/${ids.lmDu}/phieu-thu-gom`).send(slip()).expect(201);
     expect(r.body).toMatchObject({ eudrOk: true, eudrReasons: [] });
     expect(r.body.code).toMatch(/-P001$/);

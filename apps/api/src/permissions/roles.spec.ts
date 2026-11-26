@@ -50,6 +50,7 @@ describe('Bảng phân quyền', () => {
       expect(p.includes('NGUON_CUNG_QUAN_LY')).toBe(r === 'NHAN_VIEN_THU_MUA' || r === 'TRUONG_PHONG_KD');
       expect(p.includes('NGUON_CUNG_XEM_CCCD')).toBe(r === 'NHAN_VIEN_THU_MUA' || r === 'GIAM_DOC');
       expect(p.includes('NANG_SUAT_DAT')).toBe(r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC');
+      expect(p.includes('NGUON_CUNG_DUYET_RUNG')).toBe(r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC' || r === 'TRUONG_PHONG_KD');
     }
     expect(permissionsFor(['NHAN_VIEN_THU_MUA'])).not.toContain('HOP_DONG_SOAN_CUA_MINH');
     expect(requiresTwoFactor(['NHAN_VIEN_THU_MUA'])).toBe(true);

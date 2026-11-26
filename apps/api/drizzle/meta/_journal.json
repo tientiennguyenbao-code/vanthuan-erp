@@ -127,6 +127,13 @@
       "when": 1795673355163,
       "tag": "0017_phieu_thu_gom",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795677567034,
+      "tag": "0018_kiem_tra_rung_goi_eudr",
+      "breakpoints": true
     }
   ]
 }

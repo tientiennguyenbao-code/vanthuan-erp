@@ -54,7 +54,7 @@ const eudrAgents = new WeakMap<INestApplication, Promise<{ tm: Agent; gd: Agent 
 
 /**
  * Ghi thu gom cà phê đủ điều kiện EUDR vào lô mua (để phân bổ được sang lô xuất EU):
- * lập một vùng có năng suất riêng 10.000 kg/ha, một hộ, một thửa 4 ha, rồi một phiếu thu gom.
+ * lập một vùng có năng suất riêng 10.000 kg/ha, một hộ, một thửa 4 ha đã kiểm tra rừng (duyệt 4 mắt), rồi một phiếu thu gom.
  */
 export async function thuGomDuEudr(app: INestApplication, partnerId: string, lotId: string, kg: number) {
   if (!eudrAgents.has(app)) {
@@ -73,6 +73,8 @@ export async function thuGomDuEudr(app: INestApplication, partnerId: string, lot
   // Mỗi thửa một chỗ riêng để không bị cảnh báo trùng vị trí
   const pt: [number, number] = [107.9 + Math.random() * 0.6, 12.4 + Math.random() * 0.6];
   const thua = (await tm.post(`/api/nguon-cung/${partnerId}/thua`).send({ farmerId: ho, growingAreaId: vung, kind: 'thua', geometry: { type: 'Point', coordinates: pt }, declaredAreaHa: 4 }).expect(201)).body.id;
+  const kt = await tm.post('/api/kiem-tra-rung').send({ plotIds: [thua], method: 'jrc_2020', result: 'khong_rung', evidence: 'Đối chiếu bản đồ JRC GFC2020' }).expect(201);
+  await gd.post('/api/kiem-tra-rung/duyet').send({ ids: kt.body.ids, dongY: true }).expect(200);
   const r = await tm.post(`/api/lo-mua/${lotId}/phieu-thu-gom`).send({ farmerId: ho, plotId: thua, harvestDate: '2026-11-15', quantityKg: kg }).expect(201);
   if (!r.body.eudrOk) throw new Error(`Phiếu chưa đủ EUDR: ${r.body.eudrReasons.join('; ')}`);
 }

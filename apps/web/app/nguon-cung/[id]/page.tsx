@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { NhanKyc } from '@/lib/doi-tac';
 import { NGANH } from '@/lib/nhan';
-import { banDo, docGeojson, ha, HinhThua, HoSoNguonCung, LOAI_THUA, LOAI_VUNG, NGUON_NHAP, taiGeojson, Thua } from '@/lib/nguon-cung';
+import { banDo, CACH_KIEM_RUNG, docGeojson, ha, HinhThua, HoSoNguonCung, LOAI_THUA, LOAI_VUNG, NGUON_NHAP, NhanRung, taiGeojson, Thua } from '@/lib/nguon-cung';
 import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from '../../khung-trang';
 
@@ -197,6 +197,7 @@ export default function HoSoNhaCungCap() {
 
       <h2>Thửa và ao ({dangDung.length})</h2>
       <BangThua ds={d.thua} hoTheoId={hoTheoId} vungTheoId={vungTheoId} chon={chon} setChon={setChon} suaDuoc={d.duocSua} lam={lam} />
+      {d.duocSua && <KiemTraRung ds={dangDung.filter((t) => t.forestStatus === 'chua_kiem')} hoTheoId={hoTheoId} lam={lam} />}
       {d.duocSua && (
         <>
           <details className="o" style={{ marginTop: 12 }}>
@@ -256,6 +257,36 @@ export default function HoSoNhaCungCap() {
   );
 }
 
+/** Ghi kết quả kiểm tra rừng cho các thửa chưa kiểm; Trưởng phòng KD hoặc Ban Giám đốc duyệt ở trang Kiểm tra rừng. */
+function KiemTraRung({ ds, hoTheoId, lam }: { ds: Thua[]; hoTheoId: Map<string, { code: string; fullName: string }>; lam: (viec: () => Promise<unknown>, xong: string) => Promise<void> }) {
+  const [chon, setChon] = useState<string[]>([]);
+  const [f, setF] = useState({ method: 'jrc_2020', result: 'khong_rung', evidence: '' });
+  if (ds.length === 0) return null;
+  return (
+    <details className="o" style={{ marginTop: 12 }} open>
+      <summary>Ghi kết quả kiểm tra rừng ({ds.length} thửa chưa kiểm)</summary>
+      <p className="phu">Đối chiếu tọa độ thửa với bản đồ rừng năm 2020: thửa không được là rừng bị chặt hoặc suy thoái sau 31/12/2020. Kết quả cần người thứ hai duyệt mới có hiệu lực. Đo lại tọa độ thì phải kiểm lại.</p>
+      <form onSubmit={(e) => { e.preventDefault(); lam(async () => { await api('/kiem-tra-rung', { body: { plotIds: chon, ...f } }); setChon([]); setF({ ...f, evidence: '' }); }, `Đã ghi kết quả cho ${chon.length} thửa, chờ duyệt.`); }}>
+        <div className="o-chon">
+          <label><input type="checkbox" checked={chon.length === ds.length} onChange={(e) => setChon(e.target.checked ? ds.map((t) => t.id) : [])} /> Chọn tất cả</label>
+          {ds.map((t) => (
+            <label key={t.id}>
+              <input type="checkbox" checked={chon.includes(t.id)} onChange={(e) => setChon(e.target.checked ? [...chon, t.id] : chon.filter((x) => x !== t.id))} /> {t.code} · {hoTheoId.get(t.farmerId)?.fullName} · {ha(t.areaHa)}
+            </label>
+          ))}
+        </div>
+        <div className="hang">
+          <div><label htmlFor="rc">Cách kiểm</label><select id="rc" value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}>{Object.entries(CACH_KIEM_RUNG).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+          <div><label htmlFor="rk">Kết quả</label><select id="rk" value={f.result} onChange={(e) => setF({ ...f, result: e.target.value })}><option value="khong_rung">Không có rừng bị chặt sau 31/12/2020</option><option value="co_rung">Có rừng bị chặt hoặc suy thoái sau 31/12/2020</option></select></div>
+        </div>
+        <label htmlFor="rcc">Căn cứ</label>
+        <input id="rcc" required minLength={5} value={f.evidence} onChange={(e) => setF({ ...f, evidence: e.target.value })} placeholder="VD: Lớp JRC GFC2020 tra ngày 26/11/2026, ảnh chụp lưu ở hồ sơ vùng" />
+        <button style={{ marginTop: 12 }} disabled={chon.length === 0}>Ghi kết quả ({chon.length} thửa)</button>
+      </form>
+    </details>
+  );
+}
+
 function BangThua({ ds, hoTheoId, vungTheoId, chon, setChon, suaDuoc, lam }: {
   ds: Thua[];
   hoTheoId: Map<string, { code: string; fullName: string }>;
@@ -268,7 +299,7 @@ function BangThua({ ds, hoTheoId, vungTheoId, chon, setChon, suaDuoc, lam }: {
   return (
     <div className="bang-cuon">
       <table>
-        <thead><tr><th>Mã thửa</th><th>Hộ</th><th>Vùng</th><th>Tọa độ</th><th>Diện tích</th><th>Cảnh báo</th><th>Nguồn</th><th></th></tr></thead>
+        <thead><tr><th>Mã thửa</th><th>Hộ</th><th>Vùng</th><th>Tọa độ</th><th>Diện tích</th><th>Kiểm tra rừng</th><th>Cảnh báo</th><th>Nguồn</th><th></th></tr></thead>
         <tbody>
           {ds.map((t) => (
             <tr key={t.id} className={t.voidedAt ? 'huy' : ''} style={t.id === chon ? { background: 'var(--dat-nen)' } : undefined}>
@@ -277,6 +308,7 @@ function BangThua({ ds, hoTheoId, vungTheoId, chon, setChon, suaDuoc, lam }: {
               <td>{vungTheoId.get(t.growingAreaId)?.code}</td>
               <td>{t.geometryType === 'diem' ? 'Một điểm' : `Ranh giới ${t.geometry.type === 'Polygon' ? t.geometry.coordinates[0].length - 1 : 0} góc`}<div className="phu"><a href={banDo(t.tam.lat, t.tam.lon)} target="_blank" rel="noreferrer">{t.tam.lat.toFixed(5)}, {t.tam.lon.toFixed(5)}</a></div></td>
               <td>{ha(t.areaHa)}{t.declaredAreaHa !== null && t.measuredAreaHa !== null && <div className="phu">khai {ha(t.declaredAreaHa)}</div>}</td>
+              <td><NhanRung s={t.forestStatus} /></td>
               <td>{t.warnings.length ? t.warnings.map((w) => <div key={w} className="canh-bao-nhe">{w}</div>) : <span className="phu">—</span>}</td>
               <td className="phu">{NGUON_NHAP[t.source]}</td>
               <td>
@@ -286,7 +318,7 @@ function BangThua({ ds, hoTheoId, vungTheoId, chon, setChon, suaDuoc, lam }: {
               </td>
             </tr>
           ))}
-          {ds.length === 0 && <tr><td colSpan={8} className="phu">Chưa có thửa nào.</td></tr>}
+          {ds.length === 0 && <tr><td colSpan={9} className="phu">Chưa có thửa nào.</td></tr>}
         </tbody>
       </table>
     </div>

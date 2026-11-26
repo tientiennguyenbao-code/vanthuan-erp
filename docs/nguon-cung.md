@@ -45,3 +45,9 @@ Phiếu thu gom và trần sản lượng (bước 2); kiểm tra phá rừng, d
 - **Trần sản lượng**: trần của thửa trong 12 tháng = diện tích × năng suất tối đa. Ban Giám đốc đặt mức chung theo ngành và mức riêng cho vùng ở trang Nguồn cung → Năng suất tối đa. Phiếu làm vượt trần bị từ chối.
 - **Nhãn EUDR (chỉ cà phê)**: hàng của phiếu đủ EUDR khi vùng đã có mức năng suất và thửa không còn cảnh báo. Phiếu đầu tiên định nhãn cho cả lô; lô đủ EUDR không nhận hàng chưa đủ hay hàng ghi tay, và ngược lại. Bước 3 sẽ thêm điều kiện kiểm tra rừng.
 - **Chặn đi EU**: lô xuất thị trường EU chỉ phân bổ được lô mua cà phê có nhãn đủ EUDR.
+
+## Bước 3: kiểm tra rừng và gói dữ liệu EUDR
+
+- **Kiểm tra rừng theo thửa**: nhân viên thu mua đối chiếu tọa độ thửa với bản đồ rừng 2020 (JRC, Global Forest Watch) hoặc khảo sát thực địa, ghi kết quả và căn cứ cho một hay nhiều thửa. Trưởng phòng KD hoặc Ban Giám đốc duyệt ở trang Nguồn cung → Kiểm tra rừng (quyền `NGUON_CUNG_DUYET_RUNG`); người ghi không tự duyệt. Đo lại tọa độ thì kết quả cũ hết hiệu lực, phải kiểm lại.
+- **Nhãn đủ EUDR** nay đòi thêm: thửa có kết quả "không rừng" đã duyệt.
+- **Gói dữ liệu EUDR** ở trang lô xuất đi EU: thửa, hộ (chỉ mã), vùng, diện tích, khối lượng, ngày thu hoạch, kết quả kiểm tra rừng. Chốt gói thì lưu thành một bản (không sửa được) và ghi mã băm lên sổ cái hợp đồng đối ứng. Tải GeoJSON của từng bản để gửi người nhập khẩu nộp DDS.

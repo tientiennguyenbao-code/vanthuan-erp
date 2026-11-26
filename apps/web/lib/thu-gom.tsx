@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from './api';
 import { kg } from './lo-hang';
 import { ngay, ngayGio } from './nhan';
-import { ha } from './nguon-cung';
+import { ha, TRANG_THAI_RUNG } from './nguon-cung';
 
 export interface PhieuThuGom {
   id: string; code: string; farmerName: string; farmerCode: string; plotCode: string; harvestDate: string; quantityKg: number;
@@ -13,7 +13,7 @@ export interface PhieuThuGom {
 }
 export interface ThuaChon {
   id: string; code: string; farmerId: string; areaCode: string; areaHa: number; crop: string | null;
-  capKg: number | null; usedKg: number; conLaiKg: number | null; coCanhBao: boolean;
+  capKg: number | null; usedKg: number; conLaiKg: number | null; coCanhBao: boolean; forestStatus: string;
 }
 export interface DuLieuThuGom {
   lo: { id: string; code: string; status: string; collectedKg: number; eudrClass: string | null; sector: string; commodityName: string; apDungEudr: boolean };
@@ -122,7 +122,7 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
                   <option value="">{f.farmerId && thuaCuaHo.length === 0 ? 'Hộ chưa có thửa của ngành này' : 'Chọn thửa'}</option>
                   {thuaCuaHo.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.code} · {ha(t.areaHa)}{t.conLaiKg !== null ? ` · còn ${kg(t.conLaiKg)}` : ''}{t.coCanhBao ? ' · có cảnh báo' : ''}
+                      {t.code} · {ha(t.areaHa)}{t.conLaiKg !== null ? ` · còn ${kg(t.conLaiKg)}` : ''}{t.coCanhBao ? ' · có cảnh báo' : ''}{d.lo.apDungEudr && t.forestStatus !== 'khong_rung' ? ' · chưa đạt kiểm tra rừng' : ''}
                     </option>
                   ))}
                 </select>
@@ -146,11 +146,12 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
             </div>
           )}
           {thuaChon && (
-            <p className={thuaChon.capKg === null || thuaChon.coCanhBao ? 'canh-bao-nhe' : 'phu'} style={{ marginTop: 8 }}>
+            <p className={thuaChon.capKg === null || thuaChon.coCanhBao || (d.lo.apDungEudr && thuaChon.forestStatus !== 'khong_rung') ? 'canh-bao-nhe' : 'phu'} style={{ marginTop: 8 }}>
               {thuaChon.capKg === null
                 ? 'Vùng này chưa có mức năng suất tối đa, nên hàng chưa được tính là đủ EUDR. Nhờ Ban Giám đốc đặt mức ở trang Năng suất tối đa.'
                 : `Trần 12 tháng của thửa: ${kg(thuaChon.capKg)}, đã thu ${kg(thuaChon.usedKg)}, còn ${kg(thuaChon.conLaiKg)}.`}
               {thuaChon.coCanhBao && ' Thửa còn cảnh báo (chồng lấn hoặc diện tích lệch), hàng chưa đủ EUDR cho đến khi đo lại.'}
+              {d.lo.apDungEudr && thuaChon.forestStatus !== 'khong_rung' && ` Thửa chưa có kết quả kiểm tra rừng "không rừng" đã duyệt (hiện: ${TRANG_THAI_RUNG[thuaChon.forestStatus]}), nên hàng chưa đủ EUDR.`}
             </p>
           )}
           {d.ho.length > 0 && <button style={{ marginTop: 12 }}>Ghi phiếu</button>}
