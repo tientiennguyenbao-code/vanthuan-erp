@@ -108,3 +108,6 @@ details.o summary { cursor: pointer; font-weight: 600; }
 .o-chon { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; }
 .o-chon label { display: flex; gap: 6px; align-items: center; font-weight: normal; margin: 0; }
 .o-chon input[type="checkbox"] { width: auto; }
+
+td.so, th.so { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+tr.thieu td { background: color-mix(in srgb, var(--vang) 10%, transparent); }

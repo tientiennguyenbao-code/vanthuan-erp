@@ -26,6 +26,7 @@ export interface BaoGia {
   spec: string | null;
   certifications: string | null;
   deliveryTime: string | null;
+  deliveryMonth: string | null;
   paymentTerms: string | null;
   feeRatePct: number | null;
   note: string | null;
@@ -52,6 +53,7 @@ export interface NhapBaoGia {
   quyCach: string | null;
   chungNhan: string | null;
   thoiGianGiao: string | null;
+  thangGiao?: string | null;
   thanhToan: string | null;
   tyLePhiPhanTram: number | null;
   ghiChu: string | null;
@@ -74,6 +76,7 @@ export function tuBaoGia(q: BaoGia): NhapBaoGia {
     quyCach: q.spec,
     chungNhan: q.certifications,
     thoiGianGiao: q.deliveryTime,
+    thangGiao: q.deliveryMonth,
     thanhToan: q.paymentTerms,
     tyLePhiPhanTram: q.feeRatePct,
     ghiChu: q.note,
@@ -143,6 +146,7 @@ export function ONhapBaoGia({ loai, v, doi, chon }: { loai: 'mua' | 'ban'; v: Nh
         {loai === 'ban' && <div><label htmlFor="phi">Phí trọn gói (%)</label><input id="phi" inputMode="decimal" value={v.tyLePhiPhanTram ?? ''} onChange={(e) => set('tyLePhiPhanTram', e.target.value ? so(e.target.value) : null)} /></div>}
       </div>
       <div className="hang">
+        {loai === 'ban' && <div style={{ flexBasis: 180 }}><label htmlFor="thg">Tháng giao dự kiến</label><input id="thg" type="month" value={v.thangGiao ?? ''} onChange={(e) => set('thangGiao', e.target.value || null)} /></div>}
         <div style={{ flexBasis: 300 }}><label htmlFor="tgg">Thời gian giao</label><input id="tgg" value={v.thoiGianGiao ?? ''} onChange={(e) => set('thoiGianGiao', e.target.value || null)} /></div>
         <div style={{ flexBasis: 300 }}><label htmlFor="ttoan">Thanh toán</label><input id="ttoan" value={v.thanhToan ?? ''} onChange={(e) => set('thanhToan', e.target.value || null)} /></div>
         {loai === 'mua' && <div style={{ flexBasis: 240 }}><label htmlFor="cn">Chứng nhận</label><input id="cn" value={v.chungNhan ?? ''} onChange={(e) => set('chungNhan', e.target.value || null)} placeholder="VietGAP, HACCP…" /></div>}

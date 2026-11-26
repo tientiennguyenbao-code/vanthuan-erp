@@ -407,6 +407,8 @@ export const quotes = pgTable(
     portTo: text('port_to'),
     /** Ngày hết hiệu lực (YYYY-MM-DD) */
     validUntil: text('valid_until').notNull(),
+    /** Tháng dự kiến giao hàng (YYYY-MM), để đưa vào kế hoạch thu mua; trống thì tính vào tháng hiện tại */
+    deliveryMonth: text('delivery_month'),
     spec: text('spec'),
     certifications: text('certifications'),
     deliveryTime: text('delivery_time'),
@@ -1256,3 +1258,29 @@ export const eudrPackages = pgTable(
   },
   (t) => [uniqueIndex('eudr_packages_lot_version_uq').on(t.exportLotId, t.version)],
 );
+
+/**
+ * Sản lượng ước tính của một thửa theo tháng thu hoạch (kế hoạch thu mua). Nhà cung cấp khai, nhân viên thu mua
+ * chỉnh; mỗi lần đổi ghi nhật ký kèm số cũ. Tổng ước tính trong 12 tháng liên tiếp không vượt trần sản lượng của thửa.
+ */
+export const harvestEstimates = pgTable(
+  'harvest_estimates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    plotId: uuid('plot_id')
+      .notNull()
+      .references(() => plots.id),
+    /** YYYY-MM */
+    month: text('month').notNull(),
+    estimatedKg: numeric('estimated_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    /** noi_bo | cong_ncc */
+    source: text('source').notNull(),
+    note: text('note'),
+    updatedBy: uuid('updated_by')
+      .notNull()
+      .references(() => users.id),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('harvest_estimates_plot_month_uq').on(t.plotId, t.month), index('harvest_estimates_month_idx').on(t.month)],
+);
+export type HarvestEstimate = typeof harvestEstimates.$inferSelect;
