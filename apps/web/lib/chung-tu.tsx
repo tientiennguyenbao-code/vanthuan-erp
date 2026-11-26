@@ -38,7 +38,8 @@ interface ChungTu {
   chuaChac: boolean;
   quaHanRaSoat: boolean;
   legalBasis: string | null;
-  quyen: { capNhat: boolean; duyet: boolean; traLai: boolean; daGui: boolean; khongApDung: boolean };
+  tep: { id: string; phienBan: number; ten: string; kichThuoc: number; maBam: string; nguoiNop: string; luc: string }[];
+  quyen: { taiTep: boolean; capNhat: boolean; duyet: boolean; traLai: boolean; daGui: boolean; khongApDung: boolean };
 }
 interface Checklist {
   tongBatBuoc: number;
@@ -101,6 +102,31 @@ export function ChecklistChungTu({ loId, onDoi }: { loId: string; onDoi: () => v
     lam(() => api(`/chung-tu/${d.id}`, { method: 'PUT', body }), d.status === 'da_duyet' ? 'Đã sửa; chứng từ cần được duyệt lại.' : 'Đã cập nhật chứng từ.');
   }
 
+  async function taiLen(d: ChungTu, f: File | undefined) {
+    if (!f) return;
+    if (f.size > 25 * 1024 * 1024) {
+      setLoi('Tệp vượt 25 MB');
+      return;
+    }
+    await lam(async () => {
+      const fd = new FormData();
+      fd.append('tep', f);
+      const res = await fetch(`/api/chung-tu/${d.id}/tep`, { method: 'POST', body: fd, credentials: 'same-origin' });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) throw new Error(data.message ?? 'Không tải được tệp lên');
+    }, `Đã tải tệp lên: ${d.name}.${d.status === 'da_duyet' ? ' Chứng từ cần được duyệt lại.' : ''}`);
+  }
+
+  async function moTep(tepId: string) {
+    setLoi('');
+    try {
+      const r = await api<{ duongDan: string }>(`/tep/${tepId}/lien-ket`, { method: 'POST' });
+      window.open(r.duongDan, '_blank', 'noopener');
+    } catch (e) {
+      setLoi((e as Error).message);
+    }
+  }
+
   const hoiLyDo = (cau: string, fn: (l: string) => Promise<unknown>, xong: string) => {
     const l = window.prompt(cau);
     if (l) lam(() => fn(l), xong);
@@ -130,10 +156,32 @@ export function ChecklistChungTu({ loId, onDoi }: { loId: string; onDoi: () => v
       <td>
         {d.number ?? '—'}
         {d.expiresOn && <div className="phu">hết hạn {ngay(d.expiresOn)}</div>}
+        {d.tep[0] && (
+          <div>
+            <button type="button" className="lien-ket" onClick={() => moTep(d.tep[0].id)} title={`Mã băm SHA-256: ${d.tep[0].maBam}`}>
+              {d.tep[0].ten}
+            </button>
+            <div className="phu">bản {d.tep[0].phienBan} · {d.tep[0].nguoiNop}</div>
+            {d.tep.length > 1 && (
+              <details>
+                <summary className="phu">Bản cũ</summary>
+                {d.tep.slice(1).map((t) => (
+                  <div key={t.id}><button type="button" className="lien-ket" onClick={() => moTep(t.id)}>bản {t.phienBan}: {t.ten}</button> <span className="phu">{ngayGio(t.luc)}</span></div>
+                ))}
+              </details>
+            )}
+          </div>
+        )}
       </td>
       <td>
         <div className="hang" style={{ gap: 6 }}>
           {d.quyen.capNhat && <button className="phu-btn nho" onClick={() => moSua(d)}>Cập nhật</button>}
+          {d.quyen.taiTep && (
+            <label className="nut-tep nho">
+              {d.tep.length ? 'Nộp bản mới' : 'Tải tệp'}
+              <input type="file" accept="application/pdf,image/jpeg,image/png" onChange={(e) => { taiLen(d, e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+          )}
           {d.quyen.duyet && <button className="nho" onClick={() => lam(() => api(`/chung-tu/${d.id}/duyet`, { method: 'POST' }), `Đã duyệt: ${d.name}.`)}>Duyệt</button>}
           {d.quyen.traLai && <button className="phu-btn nho" onClick={() => hoiLyDo('Lý do trả lại', (l) => api(`/chung-tu/${d.id}/tra-lai`, { body: { lyDo: l } }), 'Đã trả lại chứng từ.')}>Trả lại</button>}
           {d.quyen.daGui && <button className="nho" onClick={() => lam(() => api(`/chung-tu/${d.id}/da-gui`, { method: 'POST' }), `Đã ghi gửi: ${d.name}.`)}>Đã gửi</button>}
@@ -150,7 +198,7 @@ export function ChecklistChungTu({ loId, onDoi }: { loId: string; onDoi: () => v
   const bang = (ds: ChungTu[]) => (
     <div className="bang-cuon">
       <table>
-        <thead><tr><th>Chứng từ</th><th>Yêu cầu, bên làm</th><th>Trạng thái</th><th>Số, hạn</th><th></th></tr></thead>
+        <thead><tr><th>Chứng từ</th><th>Yêu cầu, bên làm</th><th>Trạng thái</th><th>Số, hạn, tệp</th><th></th></tr></thead>
         <tbody>{ds.length ? ds.map(dong) : <tr><td colSpan={5} className="phu">Không có.</td></tr>}</tbody>
       </table>
     </div>

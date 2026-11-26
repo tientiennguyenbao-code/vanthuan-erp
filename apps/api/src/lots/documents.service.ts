@@ -1,4 +1,7 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { decrypt, encrypt } from '../common/crypto';
+import { loadConfig } from '../config/config';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -9,6 +12,7 @@ import {
   contracts,
   DocRule,
   docRules,
+  documentFiles,
   ExportLot,
   exportLots,
   feeRequests,
@@ -20,6 +24,8 @@ import {
   purchaseLots,
   users,
 } from '../db/schema';
+import { FILE_STORE, FileStore } from '../documents/file-store';
+import { decryptBytes, detectType, encryptBytes, LINK_TTL_MS, MAX_FILE_BYTES, safeFileName, sha256Bytes, signLink, verifyLink } from '../documents/file.rules';
 import { buildChecklist, completionDocProblems, DocRow, feeAmount, reviewOverdue, shippingDocProblems } from '../documents/doc.rules';
 
 export interface RuleInput {
@@ -40,6 +46,12 @@ export interface RuleInput {
   active: boolean;
 }
 
+export interface UploadedFile {
+  originalname: string;
+  size: number;
+  buffer: Buffer;
+}
+
 export interface DocUpdateInput {
   status: 'thieu' | 'dang_xin' | 'nhap';
   number: string | null;
@@ -51,6 +63,12 @@ export interface DocUpdateInput {
 
 const STATUS_LABEL: Record<string, string> = { thieu: 'chưa có', dang_xin: 'đang xin', nhap: 'có bản nháp, chờ duyệt' };
 
+/** Trình nhận tệp đọc tên tệp theo bảng mã latin1; đổi lại sang UTF-8 để giữ dấu tiếng Việt. */
+const utf8Name = (n: string) => {
+  const u = Buffer.from(n, 'latin1').toString('utf8');
+  return u.includes('\uFFFD') ? n : u;
+};
+
 const today = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
 
 /** Chứng từ của lô, quy tắc chứng từ, cổng chặn xếp tàu và đề nghị thu phí theo lô. */
@@ -60,7 +78,12 @@ export class DocumentsService {
     @Inject(DB) private readonly db: Db,
     private readonly contractsService: ContractsService,
     private readonly audit: AuditService,
+    @Inject(FILE_STORE) private readonly store: FileStore,
   ) {}
+
+  private get masterKey() {
+    return Buffer.from(loadConfig().APP_KEY, 'base64');
+  }
 
   // ---------- Quyền ----------
 
@@ -236,6 +259,18 @@ export class DocumentsService {
       .innerJoin(users, eq(users.id, gateOverrides.grantedBy))
       .where(eq(gateOverrides.exportLotId, lotId))
       .orderBy(desc(gateOverrides.grantedAt));
+    const files = rows.length
+      ? await this.db
+          .select({ f: documentFiles, uploadedByName: users.fullName })
+          .from(documentFiles)
+          .innerJoin(users, eq(users.id, documentFiles.uploadedBy))
+          .where(inArray(documentFiles.lotDocumentId, rows.map((x) => x.d.id)))
+          .orderBy(desc(documentFiles.version))
+      : [];
+    const filesOf = (docId: string) =>
+      files
+        .filter((x) => x.f.lotDocumentId === docId)
+        .map((x) => ({ id: x.f.id, phienBan: x.f.version, ten: x.f.fileName, loai: x.f.mimeType, kichThuoc: x.f.sizeBytes, maBam: x.f.sha256, quetVirus: x.f.scanStatus, nguoiNop: x.uploadedByName, luc: x.f.uploadedAt }));
     const ok = (s: string) => s === 'da_duyet' || s === 'da_gui' || s === 'khong_ap_dung';
     const bb = active.filter((x) => x.d.requirement === 'bb');
     return {
@@ -252,9 +287,11 @@ export class DocumentsService {
         quaHanRaSoat: x.quaHanRaSoat,
         chuaChac: x.uncertain,
         legalBasis: x.legalBasis,
+        tep: filesOf(x.d.id),
         quyen: {
+          taiTep: manage && !x.d.obsolete && x.d.status !== 'da_gui' && x.d.status !== 'khong_ap_dung',
           capNhat: manage && !x.d.obsolete && x.d.status !== 'da_gui' && x.d.status !== 'khong_ap_dung',
-          duyet: approver && !x.d.obsolete && x.d.status === 'nhap' && x.d.updatedBy !== ctx.user.id,
+          duyet: approver && !x.d.obsolete && x.d.status === 'nhap' && x.d.updatedBy !== ctx.user.id && files.some((f) => f.f.lotDocumentId === x.d.id),
           traLai: approver && !x.d.obsolete && (x.d.status === 'nhap' || x.d.status === 'da_duyet'),
           daGui: manage && !x.d.obsolete && x.d.status === 'da_duyet',
           khongApDung: approver && !x.d.obsolete && x.d.status !== 'da_gui' && x.d.status !== 'khong_ap_dung',
@@ -291,6 +328,8 @@ export class DocumentsService {
       this.assertLotOpen(lot);
       if (d.status !== 'nhap') throw new BadRequestException('Chỉ duyệt chứng từ đã có bản nháp hoặc bản chính');
       if (d.updatedBy === ctx.user.id) throw new ForbiddenException('Người cập nhật chứng từ không tự duyệt (nguyên tắc 4 mắt)');
+      const [f] = await tx.select({ id: documentFiles.id }).from(documentFiles).where(eq(documentFiles.lotDocumentId, id)).limit(1);
+      if (!f) throw new BadRequestException('Chưa có tệp chứng từ để đối chiếu; tải tệp lên trước khi duyệt');
       await tx.update(lotDocuments).set({ status: 'da_duyet', approvedBy: ctx.user.id, approvedAt: new Date() }).where(eq(lotDocuments.id, id));
       await this.docEvent(lot.id, 'duyet_chung_tu', d.name, ctx, tx);
     });
@@ -326,6 +365,80 @@ export class DocumentsService {
       await tx.update(lotDocuments).set({ status: 'khong_ap_dung', note: `Không áp dụng: ${reason}`, approvedBy: ctx.user.id, approvedAt: new Date(), updatedAt: new Date() }).where(eq(lotDocuments.id, id));
       await this.docEvent(lot.id, 'khong_ap_dung', `${d.name}: ${reason}`, ctx, tx);
     });
+  }
+
+  // ---------- Tệp chứng từ ----------
+
+  /**
+   * Nộp tệp cho một dòng chứng từ: kiểm loại theo nội dung, mã hoá, lưu, ghi mã băm.
+   * Nộp lại tạo phiên bản mới; chứng từ đã duyệt mà nộp tệp mới thì phải duyệt lại.
+   */
+  async uploadFile(docId: string, file: UploadedFile | undefined, ctx: AuthContext) {
+    if (!file || !file.size) throw new BadRequestException('Chọn tệp để tải lên');
+    if (file.size > MAX_FILE_BYTES) throw new PayloadTooLargeException('Tệp vượt 25 MB');
+    const type = detectType(file.buffer);
+    if (!type) throw new BadRequestException('Chỉ nhận tệp PDF, JPG hoặc PNG');
+    const hash = sha256Bytes(file.buffer);
+    const key = randomBytes(32);
+    const storageKey = `chung-tu/${docId}/${randomUUID()}`;
+    // Lưu tệp trước; nếu ghi cơ sở dữ liệu lỗi thì tệp mồ côi không ai trỏ tới, không lộ dữ liệu.
+    const { d, lot } = await this.db.transaction(async (tx) => {
+      const r = await this.lockDoc(docId, tx);
+      this.assertCanManageLot(r.lot, ctx);
+      this.assertLotOpen(r.lot);
+      if (r.d.status === 'da_gui' || r.d.status === 'khong_ap_dung') throw new BadRequestException('Chứng từ đã gửi hoặc đã đánh dấu không áp dụng');
+      return r;
+    });
+    await this.store.put(storageKey, encryptBytes(file.buffer, key));
+    return this.db.transaction(async (tx) => {
+      await this.lockDoc(docId, tx);
+      const [{ v }] = await tx.select({ v: sql<number>`coalesce(max(${documentFiles.version}), 0)::int` }).from(documentFiles).where(eq(documentFiles.lotDocumentId, docId));
+      const name = safeFileName(utf8Name(file.originalname), type.ext);
+      const [row] = await tx
+        .insert(documentFiles)
+        .values({ lotDocumentId: docId, version: v + 1, fileName: name, mimeType: type.mime, sizeBytes: file.size, sha256: hash, storageKey, keyEnc: encrypt(key.toString('base64'), this.masterKey), uploadedBy: ctx.user.id })
+        .returning();
+      const reapprove = d.status === 'da_duyet';
+      await tx
+        .update(lotDocuments)
+        .set({ updatedBy: ctx.user.id, updatedAt: new Date(), ...(reapprove ? { status: 'nhap', approvedBy: null, approvedAt: null } : {}) })
+        .where(eq(lotDocuments.id, docId));
+      await this.docEvent(lot.id, 'tep_chung_tu', `${d.name}: ${name} (phiên bản ${v + 1}, mã băm ${hash.slice(0, 12)}…)${reapprove ? ', cần duyệt lại' : ''}`, ctx, tx);
+      return { id: row.id, phienBan: v + 1, maBam: hash };
+    });
+  }
+
+  private async fileWithLot(fileId: string) {
+    const [r] = await this.db
+      .select({ f: documentFiles, lot: exportLots })
+      .from(documentFiles)
+      .innerJoin(lotDocuments, eq(lotDocuments.id, documentFiles.lotDocumentId))
+      .innerJoin(exportLots, eq(exportLots.id, lotDocuments.exportLotId))
+      .where(eq(documentFiles.id, fileId));
+    if (!r) throw new NotFoundException('Không tìm thấy tệp');
+    return r;
+  }
+
+  /** Đường dẫn tải tạm, hết hạn sau 10 phút, chỉ người xin mới dùng được. */
+  async fileLink(fileId: string, ctx: AuthContext) {
+    const { f, lot } = await this.fileWithLot(fileId);
+    this.assertCanViewLot(lot, ctx);
+    if (f.scanStatus === 'nhiem') throw new ForbiddenException('Tệp bị phát hiện có mã độc, không tải được');
+    const exp = Date.now() + LINK_TTL_MS;
+    return { duongDan: `/api/tep/tai/${signLink(f.id, ctx.user.id, exp, this.masterKey)}`, hetHan: new Date(exp) };
+  }
+
+  async download(token: string, ctx: AuthContext) {
+    const v = verifyLink(token, this.masterKey);
+    if (v === 'het_han') throw new ForbiddenException('Đường dẫn tải đã hết hạn, mở lại chứng từ để lấy đường dẫn mới');
+    if (v === 'sai' || v.userId !== ctx.user.id) throw new ForbiddenException('Đường dẫn tải không hợp lệ');
+    const { f, lot } = await this.fileWithLot(v.fileId);
+    this.assertCanViewLot(lot, ctx);
+    const key = Buffer.from(decrypt(f.keyEnc, this.masterKey), 'base64');
+    const data = decryptBytes(await this.store.get(f.storageKey), key);
+    if (sha256Bytes(data) !== f.sha256) throw new Error('Tệp không khớp mã băm đã ghi');
+    await this.audit.record({ actorUserId: ctx.user.id, action: 'tep.tai_xuong', entityType: 'document_file', entityId: f.id, detail: { lo: lot.code, ten: f.fileName, maBam: f.sha256 } });
+    return { data, fileName: f.fileName, mimeType: f.mimeType };
   }
 
   /** Giám đốc mở cổng chặn xếp tàu khi thiếu chứng từ, bắt buộc ghi lý do; chỉ dùng cho một lần xếp tàu. */

@@ -1,12 +1,15 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { z } from 'zod';
 import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators';
 import { SECTORS } from '../catalog/catalog.controller';
 import { parseBody } from '../common/validation';
 import { INCOTERMS } from '../contracts/contract.rules';
+import { MAX_FILE_BYTES } from '../documents/file.rules';
 import { EDITABLE_STATUSES, PARTIES, REQUIREMENTS, SCOPES, STAGES } from '../documents/doc.rules';
-import { DocumentsService } from './documents.service';
+import { DocumentsService, type UploadedFile as Tep } from './documents.service';
 import { MARKETS } from './lot.rules';
 
 const optText = (max: number) =>
@@ -137,6 +140,13 @@ export class DocumentsController {
     await this.docs.approveDoc(id, ctx);
   }
 
+  /** Tải tệp lên (trường "tep", PDF/JPG/PNG, tối đa 25 MB). */
+  @Post(':id/tep')
+  @UseInterceptors(FileInterceptor('tep', { limits: { fileSize: MAX_FILE_BYTES, files: 1 } }))
+  upload(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Tep | undefined, @CurrentAuth() ctx: AuthContext) {
+    return this.docs.uploadFile(id, file, ctx);
+  }
+
   @Post(':id/tra-lai')
   @HttpCode(204)
   async giveBack(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
@@ -153,6 +163,27 @@ export class DocumentsController {
   @HttpCode(204)
   async notApplicable(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
     await this.docs.markNotApplicable(id, parseBody(reasonSchema, body).lyDo, ctx);
+  }
+}
+
+@Controller('tep')
+export class FilesController {
+  constructor(private readonly docs: DocumentsService) {}
+
+  @Post(':id/lien-ket')
+  @HttpCode(200)
+  link(@Param('id', ParseUUIDPipe) id: string, @CurrentAuth() ctx: AuthContext) {
+    return this.docs.fileLink(id, ctx);
+  }
+
+  @Get('tai/:token')
+  async download(@Param('token') token: string, @CurrentAuth() ctx: AuthContext, @Res() res: Response) {
+    const f = await this.docs.download(token, ctx);
+    res.setHeader('Content-Type', f.mimeType);
+    res.setHeader('Content-Length', String(f.data.length));
+    res.setHeader('Content-Disposition', `inline; filename="tep.${f.fileName.split('.').pop()}"; filename*=UTF-8''${encodeURIComponent(f.fileName)}`);
+    res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; plugin-types application/pdf");
+    res.end(f.data);
   }
 }
 
