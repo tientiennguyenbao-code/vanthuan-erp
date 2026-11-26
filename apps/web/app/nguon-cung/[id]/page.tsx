@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { NhanKyc } from '@/lib/doi-tac';
 import { NGANH } from '@/lib/nhan';
 import { banDo, CACH_KIEM_RUNG, docGeojson, ha, HinhThua, HoSoNguonCung, LOAI_THUA, LOAI_VUNG, NGUON_NHAP, NhanRung, taiGeojson, Thua } from '@/lib/nguon-cung';
+import { MaSoVung } from '@/lib/ma-vung';
 import { NhatKyThuoc } from '@/lib/nhat-ky-thuoc';
 import { UocTinhThua } from '@/lib/uoc-tinh';
 import { useToi } from '@/lib/use-toi';
@@ -103,7 +104,7 @@ export default function HoSoNhaCungCap() {
       <h2>Vùng trồng và vùng nuôi</h2>
       <div className="bang-cuon">
         <table>
-          <thead><tr><th>Mã</th><th>Tên</th><th>Ngành</th><th>Mã số chính thức</th><th>Địa bàn</th><th>Thửa</th><th>Chứng nhận riêng của vùng</th></tr></thead>
+          <thead><tr><th>Mã</th><th>Tên</th><th>Ngành</th><th>Mã số chính thức (đã đối chiếu)</th><th>Địa bàn</th><th>Thửa</th><th>Chứng nhận riêng của vùng</th></tr></thead>
           <tbody>
             {d.vung.map((v) => {
               const ts = dangDung.filter((t) => t.growingAreaId === v.id);
@@ -112,7 +113,11 @@ export default function HoSoNhaCungCap() {
                   <td>{v.code}</td>
                   <td>{v.name}<div className="phu">{LOAI_VUNG[v.kind]}</div></td>
                   <td>{NGANH[v.sector] ?? v.sector}</td>
-                  <td>{v.officialCode ?? <span className="phu">Chưa có</span>}{v.officialCodeIssuer && <div className="phu">{v.officialCodeIssuer}</div>}</td>
+                  <td>
+                    {v.officialCode ? <>{v.officialCode}{!v.maConHieuLuc && <span className="kyc-canh-bao"> · hết hạn</span>}</> : <span className="phu">Chưa có mã đã duyệt</span>}
+                    {v.officialCodeIssuer && <div className="phu">{v.officialCodeIssuer}</div>}
+                    {v.maChoDuyet && <div className="canh-bao-nhe">Chờ đối chiếu: {v.maChoDuyet}</div>}
+                  </td>
                   <td>{[v.commune, v.district, v.province].filter(Boolean).join(', ')}</td>
                   <td>{ts.length} · {ha(ts.reduce((s, t) => s + t.areaHa, 0))}</td>
                   <td>{v.chungNhan.length ? v.chungNhan.map((c) => <div key={c.id}>{c.docType} {c.number}{c.expiresOn && <span className="phu"> · hết hạn {c.expiresOn}</span>}</div>) : <span className="phu">—</span>}</td>
@@ -123,6 +128,7 @@ export default function HoSoNhaCungCap() {
           </tbody>
         </table>
       </div>
+      {d.vung.length > 0 && <MaSoVung duong={`/ma-vung?nhaCungCap=${id}`} duongGui="/ma-vung" duongTep={(x) => `/ma-vung/${x}/tep`} vung={d.vung.filter((v) => v.active)} />}
       <p className="phu">Chứng nhận chung của nhà cung cấp: {d.chungNhanChung.map((c) => c.docType).join(', ') || '—'}. Thêm chứng nhận cho riêng một vùng ở trang hồ sơ đối tác.</p>
       {d.duocSua && (
         <details className="o">
@@ -134,7 +140,7 @@ export default function HoSoNhaCungCap() {
               <div><label htmlFor="vn">Ngành</label><select id="vn" value={vung.sector} onChange={(e) => setVung({ ...vung, sector: e.target.value })}>{Object.entries(NGANH).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
             </div>
             <div className="hang">
-              <div><label htmlFor="vm">Mã số vùng trồng / cơ sở nuôi (nếu có)</label><input id="vm" value={vung.officialCode} onChange={(e) => setVung({ ...vung, officialCode: e.target.value })} /></div>
+              <div><label htmlFor="vm">Mã số vùng trồng / cơ sở nuôi (nếu có, sẽ chờ đối chiếu)</label><input id="vm" value={vung.officialCode} onChange={(e) => setVung({ ...vung, officialCode: e.target.value })} /></div>
               <div><label htmlFor="vc">Nơi cấp mã</label><input id="vc" value={vung.officialCodeIssuer} onChange={(e) => setVung({ ...vung, officialCodeIssuer: e.target.value })} /></div>
             </div>
             <div className="hang">

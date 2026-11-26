@@ -7,7 +7,7 @@ export type LonLat = [number, number];
 export type HinhHoc = { type: 'Point'; coordinates: LonLat } | { type: 'Polygon'; coordinates: LonLat[][] };
 
 export interface Vung {
-  id: string; code: string; name: string; kind: string; sector: string; officialCode: string | null; officialCodeIssuer: string | null;
+  id: string; code: string; name: string; kind: string; sector: string; officialCode: string | null; officialCodeIssuer: string | null; officialCodeValidUntil: string | null; maConHieuLuc: boolean; maChoDuyet: string | null;
   commune: string | null; district: string | null; province: string; active: boolean;
   chungNhan: { id: string; docType: string; number: string | null; expiresOn: string | null }[];
 }

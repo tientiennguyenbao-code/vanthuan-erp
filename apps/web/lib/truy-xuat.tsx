@@ -10,7 +10,7 @@ interface TruyXuat {
   nganh: string; thiTruong: string; mucTruyXuat: string | null; tongKg: number; truyDuocKg: number; dat: boolean;
   kiemTra: Kiem[];
   loMua: { ma: string; nhaCungCap: string; khoiLuongKg: number; nhanEudr: string | null; maCoSoDongGoi: string | null; coSo: string[] }[];
-  nguon: { ma: string; loai: string; maHo: string; maVung: string; tenVung: string; maSoVung: string | null; cayTrong: string | null; khoiLuongKg: number; thuHoachTu: string; thuHoachDen: string; coNhatKyThuoc: boolean | null; luuY: string[] }[];
+  nguon: { ma: string; loai: string; maHo: string; maVung: string; tenVung: string; maSoVung: string | null; maSoVungHetHan: boolean; cayTrong: string | null; khoiLuongKg: number; thuHoachTu: string; thuHoachDen: string; coNhatKyThuoc: boolean | null; luuY: string[] }[];
   coSo: { ten: string; loai: string; ma: { loai: string; ma: string; hieuLucDen: string | null }[] }[];
 }
 
@@ -64,7 +64,7 @@ export function TruyXuatLo({ loId }: { loId: string }) {
                 <td>{n.ma}<div className="phu">{n.loai === 'ao' ? 'Ao' : 'Thửa'}{n.cayTrong ? ` · ${n.cayTrong}` : ''}</div>{n.luuY.map((x) => <div key={x} className="canh-bao-nhe">{x}</div>)}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{n.maHo}</td>
                 <td>{n.tenVung}<div className="phu">{n.maVung}</div></td>
-                <td>{n.maSoVung ?? <span className="canh-bao-nhe">Chưa có</span>}</td>
+                <td>{n.maSoVung ?? <span className="canh-bao-nhe">{n.maSoVungHetHan ? 'Mã đã hết hạn' : 'Chưa có mã đã duyệt'}</span>}</td>
                 <td>{ngay(n.thuHoachTu)}{n.thuHoachDen !== n.thuHoachTu && ` – ${ngay(n.thuHoachDen)}`}</td>
                 <td className="so">{kg(n.khoiLuongKg)}</td>
                 {d.nganh === 'gia_vi' && <td>{n.coNhatKyThuoc ? <span className="kyc-dat">Có</span> : <span className="canh-bao-nhe">Chưa có</span>}</td>}

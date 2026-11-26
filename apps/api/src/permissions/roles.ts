@@ -106,6 +106,8 @@ export const PERMISSIONS = [
   'NGUON_CUNG_XEM_CCCD',
   /** Duyệt kết quả kiểm tra rừng của thửa (người kiểm không tự duyệt) */
   'NGUON_CUNG_DUYET_RUNG',
+  /** Duyệt mã số vùng trồng / mã cơ sở nuôi sau khi đối chiếu với giấy chứng nhận (người gửi không tự duyệt) */
+  'NGUON_CUNG_DUYET_MA',
   /** Đặt năng suất tối đa (kg/ha/năm) theo ngành và theo vùng: trần sản lượng của thửa */
   'NANG_SUAT_DAT',
   // Danh mục
@@ -133,6 +135,7 @@ const BAN_GIAM_DOC: Permission[] = [
   'NGUON_CUNG_XEM',
   'NANG_SUAT_DAT',
   'NGUON_CUNG_DUYET_RUNG',
+  'NGUON_CUNG_DUYET_MA',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
@@ -174,6 +177,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'NGUON_CUNG_XEM',
     'NGUON_CUNG_QUAN_LY',
     'NGUON_CUNG_DUYET_RUNG',
+    'NGUON_CUNG_DUYET_MA',
   ],
   NHAN_VIEN_KD: [
     'HOP_DONG_SOAN_CUA_MINH',

@@ -1074,8 +1074,13 @@ export const growingAreas = pgTable(
     /** ca_phe | gia_vi | thuy_san */
     sector: text('sector').notNull(),
     /** Mã số vùng trồng (Cục BVTV) hoặc mã cơ sở nuôi, nếu đã được cấp */
+    /** Mã đã được người thứ hai duyệt đối chiếu với giấy chứng nhận; chỉ mã này được tính khi truy xuất */
     officialCode: text('official_code'),
     officialCodeIssuer: text('official_code_issuer'),
+    /** Hạn hiệu lực của mã đang dùng; null là giấy không ghi hạn */
+    officialCodeValidUntil: text('official_code_valid_until'),
+    /** Lần gửi mã đã duyệt đang dùng (bảng area_code_submissions) */
+    officialCodeSubmissionId: uuid('official_code_submission_id'),
     commune: text('commune'),
     district: text('district'),
     province: text('province').notNull(),
@@ -1346,3 +1351,42 @@ export const sprayLogs = pgTable(
   (t) => [index('spray_logs_plot_idx').on(t.plotId, t.sprayedOn)],
 );
 export type SprayLog = typeof sprayLogs.$inferSelect;
+
+/**
+ * Mỗi lần gửi mã số vùng trồng / mã cơ sở nuôi để đối chiếu: số mã, nơi cấp, hạn, bản scan giấy chứng nhận
+ * (mã hoá như tệp chứng từ). Người thứ hai duyệt sau khi so mã với giấy; chỉ ghi thêm, không xoá.
+ */
+export const areaCodeSubmissions = pgTable(
+  'area_code_submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    growingAreaId: uuid('growing_area_id')
+      .notNull()
+      .references(() => growingAreas.id),
+    officialCode: text('official_code').notNull(),
+    issuer: text('issuer'),
+    issuedOn: text('issued_on'),
+    validUntil: text('valid_until'),
+    /** Phạm vi ghi trên giấy, ví dụ "Xuất khẩu sang Trung Quốc" */
+    scope: text('scope'),
+    fileName: text('file_name'),
+    mimeType: text('mime_type'),
+    sizeBytes: integer('size_bytes'),
+    sha256: text('sha256'),
+    storageKey: text('storage_key'),
+    keyEnc: text('key_enc'),
+    /** cho_duyet | da_duyet | tu_choi | thay_the | thu_hoi */
+    status: text('status').notNull().default('cho_duyet'),
+    /** noi_bo | cong_ncc */
+    source: text('source').notNull(),
+    submittedBy: uuid('submitted_by')
+      .notNull()
+      .references(() => users.id),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+    reviewedBy: uuid('reviewed_by').references(() => users.id),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewNote: text('review_note'),
+  },
+  (t) => [index('area_code_submissions_area_idx').on(t.growingAreaId, t.status)],
+);
+export type AreaCodeSubmission = typeof areaCodeSubmissions.$inferSelect;

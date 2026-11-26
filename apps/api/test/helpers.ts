@@ -78,3 +78,16 @@ export async function thuGomDuEudr(app: INestApplication, partnerId: string, lot
   const r = await tm.post(`/api/lo-mua/${lotId}/phieu-thu-gom`).send({ farmerId: ho, plotId: thua, harvestDate: '2026-11-15', quantityKg: kg }).expect(201);
   if (!r.body.eudrOk) throw new Error(`Phiếu chưa đủ EUDR: ${r.body.eudrReasons.join('; ')}`);
 }
+
+/**
+ * Mã số vùng ghi lúc tạo vùng chỉ là lần gửi chờ duyệt. Dùng trong kiểm thử: người gửi đính bản scan,
+ * người thứ hai (có quyền duyệt mã) duyệt, để mã được tính khi truy xuất.
+ */
+export async function duyetMaVung(submitter: { get: Function; post: Function }, reviewer: { post: Function }, areaId: string) {
+  const ds = (await submitter.get(`/api/ma-vung?trangThai=cho_duyet`).expect(200)).body.ma as { id: string; vungId: string }[];
+  const s = ds.find((x) => x.vungId === areaId);
+  if (!s) throw new Error('Vùng không có mã chờ duyệt');
+  await submitter.post(`/api/ma-vung/${s.id}/tep`).attach('tep', Buffer.from('%PDF-1.4\ngiay chung nhan\n%%EOF'), 'giay-chung-nhan.pdf').expect(201);
+  await reviewer.post(`/api/ma-vung/${s.id}/duyet`).send({ dongY: true }).expect(200);
+  return s.id;
+}

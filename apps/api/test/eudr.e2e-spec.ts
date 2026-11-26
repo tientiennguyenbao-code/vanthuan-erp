@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Pool } from 'pg';
 import { PG_POOL } from '../src/db/db';
-import { codeFor, createUser, fullFirstLogin, startApp, uniqueEmail } from './helpers';
+import { codeFor, createUser, duyetMaVung, fullFirstLogin, startApp, uniqueEmail } from './helpers';
 
 type Agent = Awaited<ReturnType<typeof fullFirstLogin>>['agent'];
 
@@ -73,6 +73,7 @@ describe('Kiểm tra rừng (duyệt 4 mắt) và gói dữ liệu EUDR theo lô
     ids.tt = await signed({ loai: 'mua_ban_truc_tiep', benBanId: ncc, benMuaId: buyer, dieuKhoan: terms(3, { tyLePhiPhanTram: null, donGia: 4875 }) });
     ids.lm = (await nv.post('/api/lo-mua').send({ hopDongId: ids.mg }).expect(201)).body.id;
     ids.vung = (await tm.post(`/api/nguon-cung/${ncc}/vung`).send({ name: "Vùng Cư M'gar", kind: 'vung_trong', sector: 'ca_phe', officialCode: 'DL-CP-0099', province: 'Đắk Lắk' }).expect(201)).body.id;
+    await duyetMaVung(tm, tp, ids.vung);
     await gd.put(`/api/nang-suat/vung/${ids.vung}`).send({ kgMoiHa: 3000 }).expect(200);
     ids.ho = (await tm.post(`/api/nguon-cung/${ncc}/ho`).send({ fullName: 'Y Moan Ênuôl', province: 'Đắk Lắk', consentOn: '2026-11-01' }).expect(201)).body.id;
     const thua = (dx: number) => tm.post(`/api/nguon-cung/${ncc}/thua`).send({ farmerId: ids.ho, growingAreaId: ids.vung, kind: 'thua', crop: 'Robusta', geometry: { type: 'Point', coordinates: pt(dx) }, declaredAreaHa: 2 }).expect(201);
