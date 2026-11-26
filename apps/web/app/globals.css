@@ -102,3 +102,6 @@ a.the-lo:hover { border-color: var(--chinh); }
 .nut-lon { width: 100%; padding: 14px 16px; font-size: 16px; margin-top: 10px; }
 .canh-bao-nhe { color: var(--vang); font-weight: 600; }
 details.o summary { cursor: pointer; font-weight: 600; }
+
+.nhan-eudr { background: var(--chinh); color: #fff; border-color: var(--chinh); }
+.nhan-khong-eudr { color: var(--loi); border-color: var(--loi); }

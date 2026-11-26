@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Pool } from 'pg';
 import { PG_POOL } from '../src/db/db';
 import request from 'supertest';
-import { codeFor, createUser, fullFirstLogin, NEW_PASSWORD, startApp, uniqueEmail } from './helpers';
+import { codeFor, createUser, fullFirstLogin, NEW_PASSWORD, startApp, uniqueEmail, thuGomDuEudr } from './helpers';
 
 type Agent = Awaited<ReturnType<typeof fullFirstLogin>>['agent'];
 
@@ -56,7 +56,8 @@ describe('Cổng nhà cung cấp', () => {
   }
   async function purchaseLot(contractId: string, kg: number) {
     const id = (await nv.post('/api/lo-mua').send({ hopDongId: contractId }).expect(201)).body.id as string;
-    await nv.post(`/api/lo-mua/${id}/su-kien`).send({ loai: 'thu_gom', khoiLuongKg: kg }).expect(200);
+    // Lô đi EU: thu gom bằng phiếu theo hộ và thửa để hàng đủ điều kiện EUDR
+    await thuGomDuEudr(app, (await nv.get(`/api/lo-mua/${id}`).expect(200)).body.supplierPartnerId, id, kg);
     await nv.post(`/api/lo-mua/${id}/su-kien`).send({ loai: 'so_che', khoiLuongKg: kg }).expect(200);
     return id;
   }

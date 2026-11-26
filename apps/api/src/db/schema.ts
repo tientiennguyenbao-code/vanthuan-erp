@@ -490,6 +490,12 @@ export const purchaseLots = pgTable(
     harvestDate: text('harvest_date'),
     facilityId: uuid('facility_id').references(() => facilities.id),
     certifications: text('certifications'),
+    /**
+     * Cà phê: 'du' khi lô chỉ gom hàng đủ điều kiện EUDR (mọi phiếu thu gom đều đạt), 'khong_du' khi có hàng
+     * không đủ. Định ở lần thu gom đầu tiên và không đổi, để hai loại hàng không lẫn trong một lô. Null: chưa thu gom
+     * hoặc mặt hàng không thuộc EUDR.
+     */
+    eudrClass: text('eudr_class'),
     ownerUserId: uuid('owner_user_id')
       .notNull()
       .references(() => users.id),
@@ -1072,6 +1078,8 @@ export const growingAreas = pgTable(
     district: text('district'),
     province: text('province').notNull(),
     note: text('note'),
+    /** Năng suất tối đa riêng cho vùng (kg/ha/năm); null thì dùng mức chung của ngành do Ban Giám đốc đặt */
+    maxYieldKgPerHa: numeric('max_yield_kg_per_ha', { precision: 10, scale: 2, mode: 'number' }),
     active: boolean('active').notNull().default(true),
     createdBy: uuid('created_by')
       .notNull()
@@ -1140,3 +1148,54 @@ export const plots = pgTable(
 export type Farmer = typeof farmers.$inferSelect;
 export type GrowingArea = typeof growingAreas.$inferSelect;
 export type Plot = typeof plots.$inferSelect;
+
+/**
+ * Phiếu thu gom: một lần cân hàng của một hộ, từ một thửa, vào một lô mua. Khối lượng cộng vào lô mua.
+ * Không xoá; phiếu sai được huỷ kèm lý do (khi lô còn ở bước thu gom) và trừ lại khối lượng.
+ */
+export const collectionSlips = pgTable(
+  'collection_slips',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    purchaseLotId: uuid('purchase_lot_id')
+      .notNull()
+      .references(() => purchaseLots.id),
+    supplierPartnerId: uuid('supplier_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    farmerId: uuid('farmer_id')
+      .notNull()
+      .references(() => farmers.id),
+    plotId: uuid('plot_id')
+      .notNull()
+      .references(() => plots.id),
+    harvestDate: text('harvest_date').notNull(),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    moisturePct: numeric('moisture_pct', { precision: 5, scale: 2, mode: 'number' }),
+    weighTicketNo: text('weigh_ticket_no'),
+    /** Hàng của phiếu có đủ điều kiện EUDR không (chỉ cà phê); null với mặt hàng khác */
+    eudrOk: boolean('eudr_ok'),
+    /** Lý do chưa đủ, để người dùng biết cần bổ sung gì */
+    eudrReasons: jsonb('eudr_reasons').notNull().default([]),
+    /** Trần sản lượng của thửa lúc ghi phiếu (kg trong 12 tháng); null khi chưa có mức năng suất */
+    capKg: numeric('cap_kg', { precision: 14, scale: 2, mode: 'number' }),
+    /** noi_bo | cong_ncc */
+    source: text('source').notNull(),
+    note: text('note'),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('collection_slips_code_uq').on(t.code),
+    index('collection_slips_lot_idx').on(t.purchaseLotId),
+    index('collection_slips_plot_idx').on(t.plotId, t.harvestDate),
+  ],
+);
+
+export type CollectionSlip = typeof collectionSlips.$inferSelect;

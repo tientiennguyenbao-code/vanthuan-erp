@@ -27,6 +27,7 @@ export const LOAI_GIAO_DICH: Record<string, string> = { mua_dut: 'Mua đứt bá
 export const SU_KIEN_LO: Record<string, string> = {
   tao: 'Tạo lô',
   thu_gom: 'Thu gom',
+  huy_phieu: 'Huỷ phiếu thu gom',
   so_che: 'Sơ chế',
   nhap_kho: 'Nhập kho',
   huy: 'Huỷ lô',

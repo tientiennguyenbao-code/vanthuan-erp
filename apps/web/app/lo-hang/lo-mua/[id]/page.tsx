@@ -6,6 +6,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { kg, LOAI_GIAO_DICH, NhatKy, SuKienLo, TRANG_THAI_LO_MUA, TRANG_THAI_LO_XUAT } from '@/lib/lo-hang';
 import { ngay } from '@/lib/nhan';
+import { NhanEudr, PhieuThuGomLo } from '@/lib/thu-gom';
 import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from '../../../khung-trang';
 
@@ -23,6 +24,7 @@ interface LoMua {
   packingFacilityCode: string | null;
   harvestDate: string | null;
   certifications: string | null;
+  eudrClass: string | null;
   facilityName: string | null;
   collectedKg: number;
   lossKg: number;
@@ -88,7 +90,7 @@ export default function ChiTietLoMua() {
   return (
     <KhungTrang toi={toi}>
       <p><Link href="/lo-hang/lo-mua">← Lô mua</Link></p>
-      <h1>{lo.code} <span style={{ fontSize: 16 }}>{TRANG_THAI_LO_MUA[lo.status]}</span></h1>
+      <h1>{lo.code} <span style={{ fontSize: 16 }}>{TRANG_THAI_LO_MUA[lo.status]}</span> {lo.eudrClass && <NhanEudr eudrClass={lo.eudrClass} />}</h1>
       <p className="phu">{LOAI_GIAO_DICH[lo.dealType]} · hợp đồng <Link href={`/hop-dong/${lo.contractId}`}>{lo.contractCode}</Link> · phụ trách: {lo.ownerName}</p>
       {lo.status === 'da_huy' && <div className="loi">Đã huỷ: {lo.cancelReason}</div>}
       {thongBao && <div className="dat" role="status">{thongBao}</div>}
@@ -121,19 +123,24 @@ export default function ChiTietLoMua() {
         </div>
       </div>
 
+      {lo.status !== 'da_huy' && <PhieuThuGomLo duong={`/lo-mua/${id}/phieu-thu-gom`} duongHuy={(p) => `/phieu-thu-gom/${p}/huy`} onDoi={() => tai().catch(() => undefined)} />}
+
       {lo.quyen.capNhat && buoc && (
         <>
           <h2>Ghi sự kiện</h2>
           {lo.status === 'thu_gom' && (
             <div className="luoi">
+              {lo.eudrClass !== 'du' && (
               <form className="o" onSubmit={(e) => guiSuKien(e, 'thu_gom')}>
-                <strong>Thu gom thêm</strong>
+                <strong>Ghi tay (không theo hộ, thửa)</strong>
+                <p className="phu">Với cà phê, hàng ghi tay là hàng không đủ EUDR và cả lô không đi EU được. Nên ghi bằng phiếu thu gom ở trên.</p>
                 <label htmlFor="tg-kl">Khối lượng (kg)</label>
                 <input id="tg-kl" inputMode="decimal" required value={f.khoiLuongKg} onChange={(e) => setF({ ...f, khoiLuongKg: e.target.value })} />
                 <label htmlFor="tg-gc">Ghi chú</label>
                 <input id="tg-gc" value={f.ghiChu} onChange={(e) => setF({ ...f, ghiChu: e.target.value })} placeholder="VD: Phiếu nhập số 15" />
                 <button style={{ marginTop: 12 }}>Ghi thu gom</button>
               </form>
+              )}
               {lo.collectedKg > 0 && (
                 <form className="o" onSubmit={(e) => guiSuKien(e, 'so_che')}>
                   <strong>Sơ chế xong</strong>

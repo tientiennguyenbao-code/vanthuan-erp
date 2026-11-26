@@ -35,6 +35,12 @@ describe('quy tắc lô hàng', () => {
     expect(allocationRefusal(lot, { ...exp, commodityId: 'm2' }, 500)).toMatch(/cùng mặt hàng/);
     expect(allocationRefusal(lot, { ...exp, dealType: 'moi_gioi' }, 500)).toMatch(/cùng loại giao dịch/);
     expect(allocationRefusal(lot, { ...exp, status: 'giam_dinh' }, 500)).toMatch(/đóng gói/);
+    // Cà phê đi EU chỉ nhận lô đủ EUDR; thị trường khác và ngành khác không bị chặn
+    expect(allocationRefusal({ ...lot, eudrClass: 'khong_du' }, { ...exp, market: 'EU' }, 500, 'ca_phe')).toMatch(/EUDR/);
+    expect(allocationRefusal({ ...lot, eudrClass: null }, { ...exp, market: 'EU' }, 500, 'ca_phe')).toMatch(/EUDR/);
+    expect(allocationRefusal({ ...lot, eudrClass: 'du' }, { ...exp, market: 'EU' }, 500, 'ca_phe')).toBeNull();
+    expect(allocationRefusal({ ...lot, eudrClass: 'khong_du' }, { ...exp, market: 'US' }, 500, 'ca_phe')).toBeNull();
+    expect(allocationRefusal({ ...lot, eudrClass: null }, { ...exp, market: 'EU' }, 500, 'gia_vi')).toBeNull();
   });
 
   it('tổng phân bổ phải nằm trong dung sai hợp đồng', () => {

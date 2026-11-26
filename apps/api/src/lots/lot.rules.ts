@@ -91,15 +91,19 @@ export function gateProblems(g: ExportGateInput): string[] {
 
 /** Lý do không phân bổ được một lô mua vào một lô xuất. */
 export function allocationRefusal(
-  lot: { status: string; dealType: string; commodityId: string; availableKg: number; allocatedKg: number },
-  exp: { status: string; dealType: string; commodityId: string },
+  lot: { status: string; dealType: string; commodityId: string; availableKg: number; allocatedKg: number; eudrClass?: string | null },
+  exp: { status: string; dealType: string; commodityId: string; market?: string },
   quantityKg: number,
+  sector?: string,
 ): string | null {
   if (exp.status !== 'dong_goi') return 'Chỉ phân bổ khi lô xuất đang ở bước đóng gói';
   if (lot.status === 'da_huy') return 'Lô mua đã huỷ';
   if (lot.status === 'thu_gom') return 'Lô mua chưa sơ chế xong (chưa ghi hao hụt) nên chưa phân bổ được';
   if (lot.dealType !== exp.dealType) return 'Lô mua và lô xuất phải cùng loại giao dịch (mua đứt hoặc môi giới)';
   if (lot.commodityId !== exp.commodityId) return 'Lô mua và lô xuất phải cùng mặt hàng';
+  if (exp.market === 'EU' && sector === 'ca_phe' && lot.eudrClass !== 'du') {
+    return 'Cà phê đi EU phải là hàng đủ điều kiện EUDR: lô mua cần ghi thu gom bằng phiếu theo hộ và thửa, và mọi phiếu đều đạt';
+  }
   if (quantityKg <= 0) return 'Khối lượng phân bổ phải lớn hơn 0';
   const left = Math.round((lot.availableKg - lot.allocatedKg) * 100) / 100;
   if (quantityKg > left + 0.005) return `Lô mua chỉ còn ${fmt(left)} kg chưa phân bổ`;
