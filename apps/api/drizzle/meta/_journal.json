@@ -162,6 +162,13 @@
       "when": 1795690645473,
       "tag": "0022_thuy_san_khai_thac",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795698307237,
+      "tag": "0023_ban_hang_hoi_hang_mau",
+      "breakpoints": true
     }
   ]
 }

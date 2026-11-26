@@ -17,7 +17,9 @@ export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactN
       <header className="thanh-tren">
         <nav>
           <Link href="/"><strong>Vạn Thuận ERP</strong></Link>
+          {(coQuyen('HOP_DONG_XEM_TAT_CA') || coQuyen('HOP_DONG_SOAN_CUA_MINH')) && <Link href="/ban-hang/hoi-hang">Hỏi hàng</Link>}
           {(coQuyen('HOP_DONG_XEM_TAT_CA') || coQuyen('HOP_DONG_SOAN_CUA_MINH')) && <Link href="/bao-gia">Báo giá</Link>}
+          {(coQuyen('HOP_DONG_XEM_TAT_CA') || coQuyen('HOP_DONG_SOAN_CUA_MINH')) && <Link href="/ban-hang/mau">Mẫu hàng</Link>}
           {(coQuyen('HOP_DONG_XEM_TAT_CA') || coQuyen('HOP_DONG_SOAN_CUA_MINH')) && <Link href="/hop-dong">Hợp đồng</Link>}
           {(coQuyen('LO_HANG_XEM_TAT_CA') || coQuyen('LO_HANG_QUAN_LY_CUA_MINH')) && <Link href="/lo-hang">Lô hàng</Link>}
           {(coQuyen('QUYET_TOAN_LAP') || coQuyen('QUYET_TOAN_DUYET') || coQuyen('QUYET_TOAN_DUYET_GD')) && <Link href="/quyet-toan">Quyết toán</Link>}

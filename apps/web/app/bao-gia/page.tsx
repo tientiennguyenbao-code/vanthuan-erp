@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { HoiHang } from '@/lib/ban-hang';
 import { BaoGia, LuaChon, NhanBaoGia, NhapBaoGia, ONhapBaoGia } from '@/lib/bao-gia';
 import { DoiTac } from '@/lib/doi-tac';
 import { ngay, tien, TRANG_THAI_BAO_GIA } from '@/lib/nhan';
@@ -37,6 +38,7 @@ export default function DanhSachBaoGia() {
   const [trangThai, setTrangThai] = useState('');
   const [loi, setLoi] = useState('');
   const [moForm, setMoForm] = useState<'' | 'mua' | 'ban'>('');
+  const [tuPhieu, setTuPhieu] = useState('');
   const [v, setV] = useState<NhapBaoGia>(trong());
   const [chon, setChon] = useState<{ ncc: DoiTac[]; mua: DoiTac[]; matHang: LuaChon['matHang'] }>({ ncc: [], mua: [], matHang: [] });
 
@@ -50,11 +52,37 @@ export default function DanhSachBaoGia() {
   useEffect(() => {
     if (!toi) return;
     tai().catch((e: Error) => setLoi(e.message));
+    const hoiHangId = new URLSearchParams(window.location.search).get('hoiHang');
+    if (hoiHangId) tuHoiHang(hoiHangId).catch((e: Error) => setLoi(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toi]);
 
-  async function moTao(k: 'mua' | 'ban') {
-    setMoForm(moForm === k ? '' : k);
+  /** Mở form báo giá bán, điền sẵn từ phiếu hỏi hàng. */
+  async function tuHoiHang(hoiHangId: string) {
+    const h = await api<HoiHang>(`/hoi-hang/${hoiHangId}`);
+    await moTao('ban', false);
+    setV({
+      ...trong(),
+      hoiHangId,
+      doiTacId: h.partnerId,
+      matHangId: h.commodityId,
+      soLuong: h.quantity,
+      donVi: h.unit,
+      donGia: h.targetPrice ?? 0,
+      tienTe: h.currency ?? 'USD',
+      incoterms: h.incoterms ?? 'FOB',
+      cangDen: h.portTo,
+      quyCach: h.spec,
+      chungNhan: h.certifications,
+      thangGiao: h.deliveryMonth,
+      ghiChu: `Theo phiếu hỏi hàng ${h.code}`,
+    });
+    setTuPhieu(h.code);
+  }
+
+  async function moTao(k: 'mua' | 'ban', batTat = true) {
+    setMoForm(batTat && moForm === k ? '' : k);
+    setTuPhieu('');
     setV({ ...trong(), tienTe: k === 'mua' ? 'VND' : 'USD', incoterms: k === 'mua' ? 'EXW' : 'FOB' });
     if (chon.matHang.length) return;
     try {
@@ -110,6 +138,7 @@ export default function DanhSachBaoGia() {
       {moForm && (
         <form className="o" style={{ marginTop: 16 }} onSubmit={tao}>
           <strong>{moForm === 'mua' ? 'Báo giá mua (nhà cung cấp chào cho Vạn Thuận)' : 'Báo giá bán (Vạn Thuận chào cho người mua)'}</strong>
+          {tuPhieu && <div className="phu">Điền sẵn từ phiếu hỏi hàng {tuPhieu}; đơn giá đang là giá mục tiêu của người mua, sửa lại trước khi tạo.</div>}
           <ONhapBaoGia
             loai={moForm}
             v={v}

@@ -8,12 +8,13 @@ import { HealthController } from './health.controller';
 import { LotsModule } from './lots/lots.module';
 import { PartnersModule } from './partners/partners.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { SalesModule } from './sales/sales.module';
 import { SettlementModule } from './settlement/settlement.module';
 import { SourcingModule } from './sourcing/sourcing.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [DbModule, AuditModule, AuthModule, UsersModule, CatalogModule, PartnersModule, ContractsModule, QuotesModule, LotsModule, SettlementModule, SourcingModule],
+  imports: [DbModule, AuditModule, AuthModule, UsersModule, CatalogModule, PartnersModule, ContractsModule, QuotesModule, LotsModule, SettlementModule, SourcingModule, SalesModule],
   controllers: [HealthController],
 })
 export class AppModule {}

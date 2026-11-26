@@ -5,6 +5,7 @@ import type { AuthContext } from '../auth/auth.types';
 import type { ContractKind, ContractTerms } from '../contracts/contract.rules';
 import { ContractsService } from '../contracts/contracts.service';
 import { DB, Db, DbExecutor } from '../db/db';
+import { InquiriesService } from '../sales/inquiries.service';
 import { PlanService } from '../sourcing/plan.service';
 import { commodities, contracts, partnerRoles, partners, Quote, quoteCostLines, quotes, users } from '../db/schema';
 import { costKindsFor, CostKind, isQuoteExpired, QuoteKind, QuoteStatus, quoteValue, saleSummary, toUsd, usdPerKg } from './quote.rules';
@@ -14,6 +15,8 @@ export interface QuoteInput {
   partnerId: string;
   commodityId: string;
   sourceQuoteId?: string | null;
+  /** Phiếu hỏi hàng (chỉ báo giá bán) */
+  inquiryId?: string | null;
   quantity: number;
   unit: 'kg' | 'tan';
   unitPrice: number;
@@ -54,6 +57,7 @@ export class QuotesService {
     private readonly audit: AuditService,
     private readonly contracts: ContractsService,
     private readonly plan: PlanService,
+    private readonly inquiries: InquiriesService,
   ) {}
 
   // ---------- Đọc ----------
@@ -159,10 +163,11 @@ export class QuotesService {
     const ownerUserId = this.canDraftAll(ctx) ? (input.ownerUserId ?? ctx.user.id) : ctx.user.id;
     return this.db.transaction(async (tx) => {
       await this.checkRefs(input, tx);
+      if (input.inquiryId) await this.inquiries.attachQuote(input.inquiryId, input, ctx, tx);
       const code = await this.nextCode(input.kind, tx);
       const [q] = await tx
         .insert(quotes)
-        .values({ ...this.columns(input), code, kind: input.kind, partnerId: input.partnerId, commodityId: input.commodityId, ownerUserId, createdBy: ctx.user.id })
+        .values({ ...this.columns(input), inquiryId: input.inquiryId ?? null, code, kind: input.kind, partnerId: input.partnerId, commodityId: input.commodityId, ownerUserId, createdBy: ctx.user.id })
         .returning({ id: quotes.id, code: quotes.code });
       await this.audit.record({ actorUserId: ctx.user.id, action: 'bao_gia.tao', entityType: 'quote', entityId: q.id, detail: { ma: code, loai: input.kind } }, tx);
       return q;
@@ -174,6 +179,9 @@ export class QuotesService {
       const q = await this.lockForEdit(id, ctx, tx);
       if (q.status !== 'nhap') throw new BadRequestException('Chỉ sửa được báo giá đang soạn; báo giá đã gửi thì lập sửa đổi');
       await this.checkRefs({ ...input, kind: q.kind as QuoteKind }, tx);
+      if (q.inquiryId && (input.partnerId !== q.partnerId || input.commodityId !== q.commodityId)) {
+        throw new BadRequestException('Báo giá lập từ phiếu hỏi hàng: không đổi người mua hay mặt hàng');
+      }
       await tx
         .update(quotes)
         .set({ ...this.columns(input), partnerId: input.partnerId, commodityId: input.commodityId, updatedAt: new Date() })
@@ -269,6 +277,7 @@ export class QuotesService {
         }
       }
       await tx.update(quotes).set({ status: 'chap_nhan', contractIds: created.map((c) => c.id), updatedAt: new Date() }).where(eq(quotes.id, id));
+      if (q.inquiryId) await this.inquiries.markWon(q.inquiryId, q.code, ctx, tx);
       await this.audit.record(
         { actorUserId: ctx.user.id, action: 'bao_gia.chap_nhan', entityType: 'quote', entityId: id, detail: { loaiGiaoDich: dealType, hopDong: created.map((c) => c.code) } },
         tx,
@@ -329,6 +338,7 @@ export class QuotesService {
     const [com] = await tx.select().from(commodities).where(eq(commodities.id, input.commodityId));
     if (!com || !com.active) throw new BadRequestException('Mặt hàng không có hoặc đã ngừng');
     if (input.kind === 'mua' && input.sourceQuoteId) throw new BadRequestException('Báo giá mua không có báo giá nguồn');
+    if (input.kind === 'mua' && input.inquiryId) throw new BadRequestException('Phiếu hỏi hàng chỉ gắn với báo giá bán');
     if (input.kind === 'mua' && input.feeRatePct != null) throw new BadRequestException('Tỷ lệ phí trọn gói ghi trên báo giá bán');
     if (input.sourceQuoteId) {
       const [s] = await tx.select().from(quotes).where(eq(quotes.id, input.sourceQuoteId));
@@ -373,6 +383,7 @@ export class QuotesService {
       partnerId: q.partnerId,
       commodityId: q.commodityId,
       sourceQuoteId: q.sourceQuoteId,
+      inquiryId: q.inquiryId,
       status: q.status,
       version: q.version,
       quantity: q.quantity,

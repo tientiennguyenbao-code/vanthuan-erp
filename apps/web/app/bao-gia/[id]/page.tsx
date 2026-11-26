@@ -100,6 +100,7 @@ export default function ChiTietBaoGia() {
     <KhungTrang toi={toi}>
       <p><Link href="/bao-gia">← Báo giá</Link></p>
       <h1>{q.code} <span style={{ fontSize: 16 }}><NhanBaoGia s={q.status} hetHan={q.hetHieuLuc} /></span></h1>
+      {q.inquiryId && <p className="phu">Lập từ <Link href={`/ban-hang/hoi-hang/${q.inquiryId}`}>phiếu hỏi hàng</Link></p>}
       <p className="phu">
         Báo giá {q.kind === 'mua' ? 'mua' : 'bán'} · {q.partnerName} · {q.commodityName} · {q.version > 1 ? `sửa đổi lần ${q.version - 1}` : 'bản đầu'} · hiệu lực đến {ngay(q.validUntil)} · phụ trách: {q.ownerName}
       </p>
