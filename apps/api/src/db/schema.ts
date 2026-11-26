@@ -798,5 +798,19 @@ export const documentFiles = pgTable(
   (t) => [uniqueIndex('document_files_version_uq').on(t.lotDocumentId, t.version)],
 );
 
+/** Tài khoản cổng đối tác gắn với đối tác nào (mỗi tài khoản đối tác thuộc đúng một đối tác). */
+export const partnerUsers = pgTable('partner_users', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  partnerId: uuid('partner_id')
+    .notNull()
+    .references(() => partners.id),
+  invitedBy: uuid('invited_by')
+    .notNull()
+    .references(() => users.id),
+  invitedAt: timestamp('invited_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type DocRule = typeof docRules.$inferSelect;
 export type LotDocument = typeof lotDocuments.$inferSelect;

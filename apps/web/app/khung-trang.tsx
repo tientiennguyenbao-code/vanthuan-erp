@@ -24,6 +24,7 @@ export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactN
           {coQuyen('DOI_TAC_XEM') && <Link href="/danh-muc">Danh mục</Link>}
           {coQuyen('TAI_KHOAN_QUAN_LY') && <Link href="/quan-tri/nguoi-dung">Tài khoản</Link>}
           {coQuyen('NHAT_KY_XEM') && <Link href="/nhat-ky">Nhật ký</Link>}
+          {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong">Lô hàng của tôi</Link>}
         </nav>
         <div>
           <span className="phu">{toi.hoTen}</span>{' '}

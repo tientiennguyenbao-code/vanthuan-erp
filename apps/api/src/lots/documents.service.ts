@@ -21,6 +21,7 @@ import {
   lotDocuments,
   lotEvents,
   partners,
+  partnerUsers,
   purchaseLots,
   users,
 } from '../db/schema';
@@ -98,6 +99,43 @@ export class DocumentsService {
   private assertCanManageLot(lot: { ownerUserId: string }, ctx: AuthContext) {
     if (!this.canManageLot(lot, ctx)) throw new ForbiddenException('Bạn chỉ cập nhật được chứng từ của lô do mình phụ trách');
   }
+  /** Đối tác (nhà cung cấp) mà tài khoản cổng này thuộc về; null với tài khoản nội bộ. */
+  async portalPartner(ctx: AuthContext, exec: DbExecutor = this.db): Promise<string | null> {
+    if (!ctx.roles.includes('NHA_CUNG_CAP')) return null;
+    const [r] = await exec.select({ p: partnerUsers.partnerId }).from(partnerUsers).where(eq(partnerUsers.userId, ctx.user.id));
+    if (!r) throw new ForbiddenException('Tài khoản chưa gắn với nhà cung cấp nào');
+    return r.p;
+  }
+
+  /** Nhà cung cấp có hàng (phân bổ còn hiệu lực) trong lô xuất này không. */
+  async supplierInLot(lotId: string, partnerId: string, exec: DbExecutor = this.db) {
+    const [r] = await exec
+      .select({ id: lotAllocations.id })
+      .from(lotAllocations)
+      .innerJoin(purchaseLots, eq(purchaseLots.id, lotAllocations.purchaseLotId))
+      .where(and(eq(lotAllocations.exportLotId, lotId), eq(purchaseLots.supplierPartnerId, partnerId), isNull(lotAllocations.cancelledAt)))
+      .limit(1);
+    return !!r;
+  }
+
+  /** Dòng chứng từ thuộc phần việc của nhà cung cấp: dòng mang tên họ, hoặc dòng chung cả lô do nhà cung cấp lập (ví dụ thỏa thuận ủy quyền). */
+  async isSupplierDoc(d: { exportLotId: string; supplierPartnerId: string | null; party: string }, partnerId: string, exec: DbExecutor = this.db) {
+    if (d.supplierPartnerId) return d.supplierPartnerId === partnerId;
+    return d.party === 'nha_cung_cap' && (await this.supplierInLot(d.exportLotId, partnerId, exec));
+  }
+
+  private async assertCanEditDoc(d: typeof lotDocuments.$inferSelect, lot: ExportLot, ctx: AuthContext, exec: DbExecutor) {
+    const partner = await this.portalPartner(ctx, exec);
+    if (partner === null) return this.assertCanManageLot(lot, ctx);
+    if (!(await this.isSupplierDoc(d, partner, exec))) throw new ForbiddenException('Chứng từ này không thuộc phần việc của quý công ty');
+  }
+
+  private async assertCanViewDoc(d: typeof lotDocuments.$inferSelect, lot: ExportLot, ctx: AuthContext, exec: DbExecutor) {
+    const partner = await this.portalPartner(ctx, exec);
+    if (partner === null) return this.assertCanViewLot(lot, ctx);
+    if (!(await this.isSupplierDoc(d, partner, exec))) throw new ForbiddenException('Chứng từ này không thuộc phần việc của quý công ty');
+  }
+
   private canApprove(ctx: AuthContext) {
     return ctx.permissions.includes('CHUNG_TU_DUYET_CHECKLIST');
   }
@@ -307,7 +345,7 @@ export class DocumentsService {
   async updateDoc(id: string, input: DocUpdateInput, ctx: AuthContext) {
     await this.db.transaction(async (tx) => {
       const { d, lot } = await this.lockDoc(id, tx);
-      this.assertCanManageLot(lot, ctx);
+      await this.assertCanEditDoc(d, lot, ctx, tx);
       this.assertLotOpen(lot);
       if (d.status === 'da_gui' || d.status === 'khong_ap_dung') throw new BadRequestException('Chứng từ đã gửi hoặc đã đánh dấu không áp dụng');
       if (input.status === 'nhap' && !input.number) throw new BadRequestException('Ghi số chứng từ khi đã có bản nháp hoặc bản chính');
@@ -384,7 +422,7 @@ export class DocumentsService {
     // Lưu tệp trước; nếu ghi cơ sở dữ liệu lỗi thì tệp mồ côi không ai trỏ tới, không lộ dữ liệu.
     const { d, lot } = await this.db.transaction(async (tx) => {
       const r = await this.lockDoc(docId, tx);
-      this.assertCanManageLot(r.lot, ctx);
+      await this.assertCanEditDoc(r.d, r.lot, ctx, tx);
       this.assertLotOpen(r.lot);
       if (r.d.status === 'da_gui' || r.d.status === 'khong_ap_dung') throw new BadRequestException('Chứng từ đã gửi hoặc đã đánh dấu không áp dụng');
       return r;
@@ -410,7 +448,7 @@ export class DocumentsService {
 
   private async fileWithLot(fileId: string) {
     const [r] = await this.db
-      .select({ f: documentFiles, lot: exportLots })
+      .select({ f: documentFiles, d: lotDocuments, lot: exportLots })
       .from(documentFiles)
       .innerJoin(lotDocuments, eq(lotDocuments.id, documentFiles.lotDocumentId))
       .innerJoin(exportLots, eq(exportLots.id, lotDocuments.exportLotId))
@@ -421,8 +459,8 @@ export class DocumentsService {
 
   /** Đường dẫn tải tạm, hết hạn sau 10 phút, chỉ người xin mới dùng được. */
   async fileLink(fileId: string, ctx: AuthContext) {
-    const { f, lot } = await this.fileWithLot(fileId);
-    this.assertCanViewLot(lot, ctx);
+    const { f, d, lot } = await this.fileWithLot(fileId);
+    await this.assertCanViewDoc(d, lot, ctx, this.db);
     if (f.scanStatus === 'nhiem') throw new ForbiddenException('Tệp bị phát hiện có mã độc, không tải được');
     const exp = Date.now() + LINK_TTL_MS;
     return { duongDan: `/api/tep/tai/${signLink(f.id, ctx.user.id, exp, this.masterKey)}`, hetHan: new Date(exp) };
@@ -432,8 +470,8 @@ export class DocumentsService {
     const v = verifyLink(token, this.masterKey);
     if (v === 'het_han') throw new ForbiddenException('Đường dẫn tải đã hết hạn, mở lại chứng từ để lấy đường dẫn mới');
     if (v === 'sai' || v.userId !== ctx.user.id) throw new ForbiddenException('Đường dẫn tải không hợp lệ');
-    const { f, lot } = await this.fileWithLot(v.fileId);
-    this.assertCanViewLot(lot, ctx);
+    const { f, d, lot } = await this.fileWithLot(v.fileId);
+    await this.assertCanViewDoc(d, lot, ctx, this.db);
     const key = Buffer.from(decrypt(f.keyEnc, this.masterKey), 'base64');
     const data = decryptBytes(await this.store.get(f.storageKey), key);
     if (sha256Bytes(data) !== f.sha256) throw new Error('Tệp không khớp mã băm đã ghi');
