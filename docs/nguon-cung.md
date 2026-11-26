@@ -77,3 +77,12 @@ Bước 5b: thủy sản khai thác (giấy khai thác IUU theo tàu, chuyến; 
 | Thủy sản | truy tới ao, mã cơ sở nuôi, danh sách EU | mã FDA, SIMP | mã GACC, mã cơ sở nuôi |
 
   Các điểm về quy định nước nhập (trừ truy nguồn và EUDR) là hiểu biết chung, chưa đối chiếu văn bản gốc, nên màn hình ghi "quy định cần xác minh". Loài SIMP nhận theo tên mặt hàng hoặc loài nuôi.
+
+## Đối chiếu mã số vùng trồng / mã cơ sở nuôi
+
+- Chưa có nguồn dữ liệu chính thức để tra mã tự động, nên đối chiếu làm thủ công nhưng có dấu vết (bảng `area_code_submissions`, chỉ ghi thêm).
+- Nhân viên thu mua (`NGUON_CUNG_QUAN_LY`) hoặc nhà cung cấp trên cổng (mục Mã số vùng) gửi mã: số mã, nơi cấp, ngày cấp, hạn hiệu lực, phạm vi, kèm bản scan giấy chứng nhận (PDF/JPG/PNG, mã hoá và ghi mã băm như tệp chứng từ). Mã ghi lúc tạo vùng cũng chỉ là một lần gửi chờ duyệt.
+- Người thứ hai có quyền `NGUON_CUNG_DUYET_MA` (Trưởng phòng KD, GĐ, PGĐ; trang Duyệt mã vùng) mở bản scan, so rồi duyệt hoặc từ chối có lý do. Người gửi không tự duyệt; không duyệt được khi chưa có bản scan hoặc giấy đã hết hạn. Gửi mã mới thì lần gửi cũ còn chờ chuyển "đã thay"; duyệt mã mới thì mã cũ chuyển "đã thay". Mã đã duyệt có thể thu hồi (vùng trở về chưa có mã).
+- Chỉ mã đã duyệt mới ghi vào vùng (`growing_areas.official_code`, kèm hạn). Truy xuất lô xuất chỉ tính mã còn hiệu lực vào ngày xem; mã hết hạn hiện "Mã đã hết hạn".
+- Migration chuyển các mã đã ghi trước đây thành lần gửi chờ duyệt.
+- Bước sau (chưa làm): định kỳ nạp danh sách mã do cơ quan cấp công bố, và danh sách mã được nước nhập khẩu chấp thuận, để phần mềm tự so.

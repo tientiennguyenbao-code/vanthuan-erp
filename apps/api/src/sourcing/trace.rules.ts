@@ -136,9 +136,9 @@ export function traceChecks(rule: MarketRule, f: TraceFacts): CheckResult[] {
         const thieu = f.nguon.filter((n) => !n.maSoVung).map((n) => n.ma);
         return {
           ma: k,
-          ten: 'Mã số vùng trồng / mã cơ sở nuôi do cơ quan nhà nước cấp',
+          ten: 'Mã số vùng trồng / mã cơ sở nuôi do cơ quan nhà nước cấp, đã đối chiếu giấy chứng nhận',
           dat: f.nguon.length > 0 && thieu.length === 0,
-          chiTiet: f.nguon.length === 0 ? ['Chưa có thửa hay ao nào góp hàng qua phiếu thu gom'] : thieu.length ? [`Vùng của các thửa/ao sau chưa có mã: ${thieu.join(', ')}`] : ['Mọi vùng góp hàng đã có mã'],
+          chiTiet: f.nguon.length === 0 ? ['Chưa có thửa hay ao nào góp hàng qua phiếu thu gom'] : thieu.length ? [`Vùng của các thửa/ao sau chưa có mã đã duyệt còn hiệu lực: ${thieu.join(', ')}`] : ['Mọi vùng góp hàng có mã đã duyệt, còn hiệu lực'],
           canXacMinh: true,
         };
       }
@@ -148,7 +148,7 @@ export function traceChecks(rule: MarketRule, f: TraceFacts): CheckResult[] {
           ma: k,
           ten: 'Dữ liệu SIMP cho người nhập Mỹ: nơi nuôi hoặc nơi đánh bắt của mọi kg',
           dat: allTraced && f.nguon.every((n) => !!n.maSoVung),
-          chiTiet: allTraced ? (f.nguon.every((n) => !!n.maSoVung) ? ['Mọi ao góp hàng đã có mã cơ sở nuôi'] : ['Có ao chưa có mã cơ sở nuôi']) : [`Mới truy được ${fmt(f.truyDuocKg)} / ${fmt(f.tongKg)} kg tới ao nuôi`],
+          chiTiet: allTraced ? (f.nguon.every((n) => !!n.maSoVung) ? ['Mọi ao góp hàng có mã cơ sở nuôi đã duyệt, còn hiệu lực'] : ['Có ao chưa có mã cơ sở nuôi đã duyệt còn hiệu lực']) : [`Mới truy được ${fmt(f.truyDuocKg)} / ${fmt(f.tongKg)} kg tới ao nuôi`],
           canXacMinh: true,
         };
       default:

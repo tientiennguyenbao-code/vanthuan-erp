@@ -24,6 +24,7 @@ export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactN
           {coQuyen('NGUON_CUNG_QUAN_LY') && !coQuyen('LO_HANG_XEM_TAT_CA') && !coQuyen('LO_HANG_QUAN_LY_CUA_MINH') && <Link href="/lo-hang/lo-mua">Lô mua</Link>}
           {coQuyen('NGUON_CUNG_XEM') && <Link href="/nguon-cung">Nguồn cung</Link>}
           {coQuyen('NGUON_CUNG_XEM') && <Link href="/nguon-cung/ke-hoach">Kế hoạch thu mua</Link>}
+          {coQuyen('NGUON_CUNG_DUYET_MA') && <Link href="/nguon-cung/ma-vung">Duyệt mã vùng</Link>}
           {coQuyen('DOI_TAC_XEM') && <Link href="/doi-tac">Đối tác</Link>}
           {coQuyen('DOI_TAC_XEM') && <Link href="/danh-muc">Danh mục</Link>}
           {coQuyen('TAI_KHOAN_QUAN_LY') && <Link href="/quan-tri/nguoi-dung">Tài khoản</Link>}
@@ -33,6 +34,7 @@ export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactN
           {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong/thu-gom">Thu gom</Link>}
           {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong/uoc-tinh">Sản lượng dự kiến</Link>}
           {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong/nhat-ky-thuoc">Nhật ký thuốc</Link>}
+          {toi.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP') && <Link href="/cong/ma-vung">Mã số vùng</Link>}
         </nav>
         <div>
           <span className="phu">{toi.hoTen}</span>{' '}

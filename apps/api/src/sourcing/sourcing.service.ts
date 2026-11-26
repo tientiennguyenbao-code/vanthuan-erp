@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { decrypt, encrypt, sha256Hex } from '../common/crypto';
 import { loadConfig } from '../config/config';
 import { DB, Db, DbExecutor } from '../db/db';
-import { farmers, growingAreas, partnerDocuments, plotForestChecks, partnerRoles, partners, partnerUsers, plots } from '../db/schema';
+import { areaCodeSubmissions, farmers, growingAreas, partnerDocuments, plotForestChecks, partnerRoles, partners, partnerUsers, plots } from '../db/schema';
 import {
   AreaKind,
   centroid,
@@ -151,6 +151,12 @@ export class SourcingService {
     const areas = await this.db.select().from(growingAreas).where(eq(growingAreas.supplierPartnerId, partnerId)).orderBy(asc(growingAreas.code));
     const fs = await this.db.select().from(farmers).where(eq(farmers.supplierPartnerId, partnerId)).orderBy(asc(farmers.code));
     const ps = await this.db.select().from(plots).where(eq(plots.supplierPartnerId, partnerId)).orderBy(asc(plots.code));
+    const pending = areas.length
+      ? await this.db
+          .select({ areaId: areaCodeSubmissions.growingAreaId, code: areaCodeSubmissions.officialCode })
+          .from(areaCodeSubmissions)
+          .where(and(inArray(areaCodeSubmissions.growingAreaId, areas.map((a) => a.id)), eq(areaCodeSubmissions.status, 'cho_duyet')))
+      : [];
     const certs = await this.db
       .select()
       .from(partnerDocuments)
@@ -161,6 +167,8 @@ export class SourcingService {
       duocSua: canEdit && p.kycStatus === 'dat',
       vung: areas.map((a) => ({
         ...a,
+        maChoDuyet: pending.find((x) => x.areaId === a.id)?.code ?? null,
+        maConHieuLuc: !!a.officialCode && (!a.officialCodeValidUntil || a.officialCodeValidUntil >= new Date().toISOString().slice(0, 10)),
         chungNhan: certs.filter((c) => c.growingAreaId === a.id).map((c) => ({ id: c.id, docType: c.docType, number: c.number, expiresOn: c.expiresOn })),
       })),
       chungNhanChung: certs.filter((c) => !c.growingAreaId).map((c) => ({ id: c.id, docType: c.docType, number: c.number, expiresOn: c.expiresOn })),
@@ -225,12 +233,15 @@ export class SourcingService {
         .insert(growingAreas)
         .values({
           supplierPartnerId: partnerId, code, name: input.name.trim(), kind: input.kind, sector: input.sector,
-          officialCode: input.officialCode?.trim() || null, officialCodeIssuer: input.officialCodeIssuer?.trim() || null,
           commune: input.commune?.trim() || null, district: input.district?.trim() || null, province: input.province.trim(), note: input.note?.trim() || null,
           createdBy: ctx.user.id,
         })
         .returning();
-      await this.audit.record({ actorUserId: ctx.user.id, action: 'nguon_cung.tao_vung', entityType: 'growing_area', entityId: a.id, ip, detail: { ma: code, ten: a.name, maSoChinhThuc: a.officialCode } }, tx);
+      await this.audit.record({ actorUserId: ctx.user.id, action: 'nguon_cung.tao_vung', entityType: 'growing_area', entityId: a.id, ip, detail: { ma: code, ten: a.name, maSoChinhThuc: input.officialCode?.trim() || null } }, tx);
+      // Mã ghi lúc tạo vùng chỉ là lần gửi chờ duyệt: cần bản scan giấy chứng nhận và người thứ hai đối chiếu
+      if (input.officialCode?.trim()) {
+        await tx.insert(areaCodeSubmissions).values({ growingAreaId: a.id, officialCode: input.officialCode.trim(), issuer: input.officialCodeIssuer?.trim() || null, source: 'noi_bo', submittedBy: ctx.user.id });
+      }
       return { id: a.id, code };
     });
   }

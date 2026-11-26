@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { AuthContext } from '../auth/auth.types';
 import { DB, Db } from '../db/db';
 import { collectionSlips, commodities, exportLots, facilities, facilityCodes, farmers, growingAreas, lotAllocations, lotEvents, partners, plots, purchaseLots, sprayLogs } from '../db/schema';
+import { codeInEffect } from '../sourcing/area-code.rules';
 import { FACILITY_SCHEMES, FacilityScheme, isSimpSpecies, ruleFor, traceChecks, TraceFacts } from '../sourcing/trace.rules';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -62,6 +63,7 @@ export class TraceService {
             areaCode: growingAreas.code,
             areaName: growingAreas.name,
             officialCode: growingAreas.officialCode,
+            codeValidUntil: growingAreas.officialCodeValidUntil,
             kg: sql<number>`sum(${collectionSlips.quantityKg})::float8`,
             from: sql<string>`min(${collectionSlips.harvestDate})`,
             to: sql<string>`max(${collectionSlips.harvestDate})`,
@@ -73,11 +75,11 @@ export class TraceService {
           .innerJoin(growingAreas, eq(growingAreas.id, plots.growingAreaId))
           .leftJoin(sql`lateral jsonb_array_elements_text(${collectionSlips.traceIssues}) as x(issue)`, sql`true`)
           .where(and(inArray(collectionSlips.purchaseLotId, lotIds), isNull(collectionSlips.voidedAt)))
-          .groupBy(collectionSlips.purchaseLotId, plots.id, farmers.code, growingAreas.code, growingAreas.name, growingAreas.officialCode)
+          .groupBy(collectionSlips.purchaseLotId, plots.id, farmers.code, growingAreas.code, growingAreas.name, growingAreas.officialCode, growingAreas.officialCodeValidUntil)
       : [];
 
     const allocBy = new Map(allocs.map((a) => [a.purchaseLotId, a]));
-    const bySource = new Map<string, { plot: (typeof slips)[number]['plot']; farmerCode: string; areaCode: string; areaName: string; officialCode: string | null; kg: number; from: string; to: string; issues: Set<string> }>();
+    const bySource = new Map<string, { plot: (typeof slips)[number]['plot']; farmerCode: string; areaCode: string; areaName: string; officialCode: string | null; codeExpired: boolean; kg: number; from: string; to: string; issues: Set<string> }>();
     for (const s of slips) {
       const a = allocBy.get(s.purchaseLotId)!;
       const share = a.collectedKg > 0 ? (s.kg * a.kg) / a.collectedKg : 0;
@@ -88,7 +90,7 @@ export class TraceService {
         if (s.to > cur.to) cur.to = s.to;
         for (const i of s.issues) cur.issues.add(i);
       } else {
-        bySource.set(s.plot.id, { plot: s.plot, farmerCode: s.farmerCode, areaCode: s.areaCode, areaName: s.areaName, officialCode: s.officialCode, kg: share, from: s.from, to: s.to, issues: new Set(s.issues) });
+        bySource.set(s.plot.id, { plot: s.plot, farmerCode: s.farmerCode, areaCode: s.areaCode, areaName: s.areaName, officialCode: codeInEffect(s.codeValidUntil, today()) ? s.officialCode : null, codeExpired: !!s.officialCode && !codeInEffect(s.codeValidUntil, today()), kg: share, from: s.from, to: s.to, issues: new Set(s.issues) });
       }
     }
     const sources = [...bySource.values()].sort((x, y) => x.plot.code.localeCompare(y.plot.code));
@@ -166,6 +168,7 @@ export class TraceService {
         maVung: s.areaCode,
         tenVung: s.areaName,
         maSoVung: s.officialCode,
+        maSoVungHetHan: s.codeExpired,
         cayTrong: s.plot.crop,
         khoiLuongKg: r2(s.kg),
         thuHoachTu: s.from,
