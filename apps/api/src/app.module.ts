@@ -9,10 +9,11 @@ import { LotsModule } from './lots/lots.module';
 import { PartnersModule } from './partners/partners.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { SettlementModule } from './settlement/settlement.module';
+import { SourcingModule } from './sourcing/sourcing.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [DbModule, AuditModule, AuthModule, UsersModule, CatalogModule, PartnersModule, ContractsModule, QuotesModule, LotsModule, SettlementModule],
+  imports: [DbModule, AuditModule, AuthModule, UsersModule, CatalogModule, PartnersModule, ContractsModule, QuotesModule, LotsModule, SettlementModule, SourcingModule],
   controllers: [HealthController],
 })
 export class AppModule {}

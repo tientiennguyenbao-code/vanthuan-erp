@@ -3,7 +3,7 @@ import { and, asc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { DB, Db, DbExecutor } from '../db/db';
-import { partnerContacts, partnerDocuments, partnerRoles, partners, users } from '../db/schema';
+import { growingAreas, partnerContacts, partnerDocuments, partnerRoles, partners, users } from '../db/schema';
 import {
   addMonths,
   effectiveKycStatus,
@@ -40,6 +40,8 @@ export interface DocumentInput {
   issuedOn?: string | null;
   expiresOn?: string | null;
   note?: string | null;
+  /** Chứng nhận chỉ cho một vùng trồng / vùng nuôi của đối tác này */
+  growingAreaId?: string | null;
 }
 
 /** Các trường định danh pháp lý: sửa sau khi đã duyệt thì phải thẩm định lại. */
@@ -219,12 +221,16 @@ export class PartnersService {
     }
     return this.db.transaction(async (tx) => {
       await this.lockForEdit(partnerId, ctx, tx);
+      if (input.growingAreaId) {
+        const [a] = await tx.select({ p: growingAreas.supplierPartnerId }).from(growingAreas).where(eq(growingAreas.id, input.growingAreaId));
+        if (!a || a.p !== partnerId) throw new BadRequestException('Vùng không thuộc đối tác này');
+      }
       const [d] = await tx
         .insert(partnerDocuments)
         .values({ partnerId, ...input, createdBy: ctx.user.id })
         .returning({ id: partnerDocuments.id });
       await this.audit.record(
-        { actorUserId: ctx.user.id, action: 'doi_tac.them_tai_lieu', entityType: 'partner', entityId: partnerId, ip, detail: { loai: input.docType, so: input.number, hetHan: input.expiresOn } },
+        { actorUserId: ctx.user.id, action: 'doi_tac.them_tai_lieu', entityType: 'partner', entityId: partnerId, ip, detail: { loai: input.docType, so: input.number, hetHan: input.expiresOn, vung: input.growingAreaId ?? null } },
         tx,
       );
       return { id: d.id };

@@ -9,6 +9,7 @@ export const ROLES = [
   'KE_TOAN_TRUONG',
   'TRUONG_PHONG_KD',
   'NHAN_VIEN_KD',
+  'NHAN_VIEN_THU_MUA',
   'KE_TOAN_VIEN',
   'QUAN_TRI_HE_THONG',
   // Vai trò của đối tác trên cổng (dùng từ phân hệ cổng đối tác)
@@ -24,6 +25,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   KE_TOAN_TRUONG: 'Kế toán trưởng',
   TRUONG_PHONG_KD: 'Trưởng phòng kinh doanh',
   NHAN_VIEN_KD: 'Nhân viên kinh doanh',
+  NHAN_VIEN_THU_MUA: 'Nhân viên thu mua',
   KE_TOAN_VIEN: 'Kế toán viên',
   QUAN_TRI_HE_THONG: 'Quản trị hệ thống',
   NHA_CUNG_CAP: 'Nhà cung cấp',
@@ -37,6 +39,7 @@ export const STAFF_ROLES: readonly Role[] = [
   'KE_TOAN_TRUONG',
   'TRUONG_PHONG_KD',
   'NHAN_VIEN_KD',
+  'NHAN_VIEN_THU_MUA',
   'KE_TOAN_VIEN',
   'QUAN_TRI_HE_THONG',
 ];
@@ -95,6 +98,12 @@ export const PERMISSIONS = [
   /** Duyệt thẩm định đối tác rủi ro cao */
   'DOI_TAC_DUYET_RUI_RO_CAO',
   'DOI_TAC_MOI_CONG',
+  // Nguồn cung: nông hộ, vùng trồng, thửa
+  'NGUON_CUNG_XEM',
+  /** Thêm, sửa, huỷ hộ, vùng trồng, thửa của mọi nhà cung cấp */
+  'NGUON_CUNG_QUAN_LY',
+  /** Xem đầy đủ số CCCD của nông hộ (mỗi lần xem được ghi nhật ký) */
+  'NGUON_CUNG_XEM_CCCD',
   // Danh mục
   'DANH_MUC_QUAN_LY',
   // Quản trị
@@ -117,10 +126,11 @@ const BAN_GIAM_DOC: Permission[] = [
   'DANH_MUC_QUAN_LY',
   'NHAT_KY_XEM',
   'KHIEU_NAI_GIAI_QUYET',
+  'NGUON_CUNG_XEM',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  GIAM_DOC: [...BAN_GIAM_DOC, 'HOP_DONG_UY_QUYEN', 'LO_HANG_MO_CHAN', 'THANH_TOAN_DUYET_VUOT', 'QUYET_TOAN_DUYET_GD'],
+  GIAM_DOC: [...BAN_GIAM_DOC, 'NGUON_CUNG_XEM_CCCD', 'HOP_DONG_UY_QUYEN', 'LO_HANG_MO_CHAN', 'THANH_TOAN_DUYET_VUOT', 'QUYET_TOAN_DUYET_GD'],
   // Phó Giám đốc ký hợp đồng theo ủy quyền của Giám đốc: phân hệ hợp đồng kiểm tra văn bản
   // ủy quyền còn hiệu lực và hạn mức trước mỗi lần ký.
   PHO_GIAM_DOC: BAN_GIAM_DOC,
@@ -137,6 +147,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'QUYET_TOAN_LAP',
     'QUYET_TOAN_DUYET',
     'DOI_TAC_XEM',
+    'NGUON_CUNG_XEM',
   ],
   TRUONG_PHONG_KD: [
     'HOP_DONG_XEM_TAT_CA',
@@ -154,6 +165,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'DANH_MUC_QUAN_LY',
     'KHIEU_NAI_MO',
     'KHIEU_NAI_GIAI_QUYET',
+    'NGUON_CUNG_XEM',
+    'NGUON_CUNG_QUAN_LY',
   ],
   NHAN_VIEN_KD: [
     'HOP_DONG_SOAN_CUA_MINH',
@@ -164,7 +177,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'DOI_TAC_QUAN_LY',
     'DOI_TAC_MOI_CONG',
     'KHIEU_NAI_MO',
+    'NGUON_CUNG_XEM',
   ],
+  // Thu mua: lập hồ sơ nông hộ, vùng trồng, thửa của mọi nhà cung cấp; xem đối tác để biết nhà cung cấp nào đã thẩm định.
+  NHAN_VIEN_THU_MUA: ['DOI_TAC_XEM', 'NGUON_CUNG_XEM', 'NGUON_CUNG_QUAN_LY', 'NGUON_CUNG_XEM_CCCD'],
   KE_TOAN_VIEN: [
     'HOP_DONG_XEM_TAT_CA',
     'LO_HANG_XEM_TAT_CA',
