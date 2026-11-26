@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { kg, LOAI_GIAO_DICH, THI_TRUONG, TRANG_THAI_LO_XUAT } from '@/lib/lo-hang';
 import { ngay } from '@/lib/nhan';
+import { XacNhanTienHang } from '@/lib/thanh-toan';
 import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from '../khung-trang';
 
@@ -57,6 +58,7 @@ export default function CongNhaCungCap() {
           </Link>
         ))}
       </div>
+      <XacNhanTienHang />
     </KhungTrang>
   );
 }
