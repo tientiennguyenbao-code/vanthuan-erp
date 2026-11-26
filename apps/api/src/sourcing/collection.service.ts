@@ -3,7 +3,8 @@ import { and, asc, between, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { DB, Db, DbExecutor } from '../db/db';
-import { collectionSlips, commodities, farmers, growingAreas, lotEvents, partners, plots, PurchaseLot, purchaseLots, settings, users } from '../db/schema';
+import { collectionSlips, commodities, farmers, growingAreas, lotEvents, partners, plots, PurchaseLot, purchaseLots, settings, sprayLogs, users } from '../db/schema';
+import { phiIssues } from './trace.rules';
 import {
   capRefusal,
   classRefusal,
@@ -154,6 +155,7 @@ export class CollectionService {
         eudrOk: x.s.eudrOk,
         eudrReasons: x.s.eudrReasons as string[],
         capKg: x.s.capKg,
+        luuY: x.s.traceIssues as string[],
         source: x.s.source,
         note: x.s.note,
         createdByName: x.createdByName,
@@ -249,6 +251,15 @@ export class CollectionService {
         if (refusal) throw new BadRequestException(`${refusal}${reasons.length ? ` (${reasons.join('; ')})` : ''}`);
         lotClass = slipClass;
       }
+      // Gia vị: thu hoạch trong thời gian cách ly thuốc BVTV thì ghi lưu ý (không chặn)
+      let traceIssues: string[] = [];
+      if (sector === 'gia_vi') {
+        const sprays = await tx
+          .select({ sprayedOn: sprayLogs.sprayedOn, product: sprayLogs.product, phiDays: sprayLogs.phiDays })
+          .from(sprayLogs)
+          .where(and(eq(sprayLogs.plotId, p.id), isNull(sprayLogs.voidedAt), sql`${sprayLogs.sprayedOn} <= ${input.harvestDate}`));
+        traceIssues = phiIssues(sprays, input.harvestDate);
+      }
 
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(collectionSlips).where(eq(collectionSlips.purchaseLotId, lot.id));
       const code = `${lot.code}-P${String(n + 1).padStart(3, '0')}`;
@@ -268,6 +279,7 @@ export class CollectionService {
           eudrOk,
           eudrReasons: reasons,
           capKg: cap,
+          traceIssues,
           source,
           note: input.note ?? null,
           createdBy: ctx.user.id,
@@ -286,7 +298,7 @@ export class CollectionService {
         { actorUserId: ctx.user.id, action: 'phieu_thu_gom.tao', entityType: 'collection_slip', entityId: slip.id, ip, detail: { code, lo: lot.code, ho: f.code, thua: p.code, kg: qty, duEudr: eudrOk, nguon: source } },
         tx,
       );
-      return { id: slip.id, code, eudrOk, eudrReasons: reasons };
+      return { id: slip.id, code, eudrOk, eudrReasons: reasons, luuY: traceIssues };
     });
   }
 

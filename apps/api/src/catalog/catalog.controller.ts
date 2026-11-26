@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth, RequirePermissions } from '../auth/decorators';
 import { parseBody } from '../common/validation';
+import { FACILITY_SCHEMES } from '../sourcing/trace.rules';
 import { CatalogService } from './catalog.service';
 
 export const SECTORS = ['ca_phe', 'gia_vi', 'thuy_san'] as const;
@@ -24,6 +25,14 @@ const facilitySchema = z.object({
   capacityKg: z.number().int().positive().nullish(),
   certifications: z.string().trim().max(300).nullish(),
 });
+
+const facilityCodeSchema = z.object({
+  loai: z.enum(FACILITY_SCHEMES),
+  ma: z.string().trim().min(3, 'Nhập mã').max(60),
+  hieuLucDen: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày dạng YYYY-MM-DD').nullish(),
+  ghiChu: z.string().trim().max(300).nullish(),
+});
+const voidSchema = z.object({ lyDo: z.string().trim().min(3, 'Ghi lý do huỷ').max(300) });
 
 @Controller('danh-muc')
 export class CatalogController {
@@ -63,5 +72,20 @@ export class CatalogController {
       throw new BadRequestException('Kho, xưởng đi thuê hoặc của nhà cung cấp phải ghi đối tác sở hữu');
     }
     return this.catalog.createFacility(input, ctx.user.id, req.ip ?? null);
+  }
+
+  @RequirePermissions('DANH_MUC_QUAN_LY')
+  @Post('co-so/:id/ma')
+  addCode(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext, @Req() req: Request) {
+    const b = parseBody(facilityCodeSchema, body);
+    return this.catalog.addFacilityCode(id, { scheme: b.loai, code: b.ma, validUntil: b.hieuLucDen ?? null, note: b.ghiChu || null }, ctx.user.id, req.ip ?? null);
+  }
+
+  @RequirePermissions('DANH_MUC_QUAN_LY')
+  @Post('ma-co-so/:id/huy')
+  @HttpCode(200)
+  async voidCode(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext, @Req() req: Request) {
+    await this.catalog.voidFacilityCode(id, parseBody(voidSchema, body).lyDo, ctx.user.id, req.ip ?? null);
+    return { ok: true };
   }
 }

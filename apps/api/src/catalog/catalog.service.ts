@@ -1,8 +1,8 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service';
 import { DB, Db } from '../db/db';
-import { commodities, facilities, partners } from '../db/schema';
+import { commodities, facilities, facilityCodes, partners } from '../db/schema';
 
 export interface CommodityInput {
   code: string;
@@ -58,13 +58,41 @@ export class CatalogService {
     });
   }
 
-  listFacilities() {
-    return this.db
+  async listFacilities() {
+    const rows = await this.db
       .select({ f: facilities, partnerName: partners.name })
       .from(facilities)
       .leftJoin(partners, eq(partners.id, facilities.partnerId))
-      .orderBy(asc(facilities.name))
-      .then((rows) => rows.map((r) => ({ ...r.f, partnerName: r.partnerName })));
+      .orderBy(asc(facilities.name));
+    const codes = await this.db.select().from(facilityCodes).where(isNull(facilityCodes.voidedAt)).orderBy(asc(facilityCodes.scheme));
+    return rows.map((r) => ({
+      ...r.f,
+      partnerName: r.partnerName,
+      ma: codes.filter((c) => c.facilityId === r.f.id).map((c) => ({ id: c.id, loai: c.scheme, ma: c.code, hieuLucDen: c.validUntil, ghiChu: c.note })),
+    }));
+  }
+
+  /** Ghi mã đăng ký của cơ sở với nước nhập (FDA, GACC, danh sách EU). Mỗi cơ sở một mã còn dùng cho mỗi loại. */
+  async addFacilityCode(facilityId: string, input: { scheme: string; code: string; validUntil: string | null; note: string | null }, actorId: string, ip: string | null) {
+    return this.db.transaction(async (tx) => {
+      const [f] = await tx.select().from(facilities).where(eq(facilities.id, facilityId)).for('update');
+      if (!f) throw new NotFoundException('Không tìm thấy cơ sở');
+      const [dup] = await tx.select({ id: facilityCodes.id }).from(facilityCodes).where(and(eq(facilityCodes.facilityId, facilityId), eq(facilityCodes.scheme, input.scheme), isNull(facilityCodes.voidedAt)));
+      if (dup) throw new BadRequestException('Cơ sở đã có mã loại này; huỷ mã cũ trước khi ghi mã mới');
+      const [c] = await tx.insert(facilityCodes).values({ facilityId, ...input, createdBy: actorId }).returning({ id: facilityCodes.id });
+      await this.audit.record({ actorUserId: actorId, action: 'danh_muc.ghi_ma_co_so', entityType: 'facility', entityId: facilityId, ip, detail: { coSo: f.name, ...input } }, tx);
+      return { id: c.id };
+    });
+  }
+
+  async voidFacilityCode(id: string, reason: string, actorId: string, ip: string | null) {
+    await this.db.transaction(async (tx) => {
+      const [c] = await tx.select().from(facilityCodes).where(eq(facilityCodes.id, id)).for('update');
+      if (!c) throw new NotFoundException('Không tìm thấy mã');
+      if (c.voidedAt) throw new BadRequestException('Mã này đã huỷ');
+      await tx.update(facilityCodes).set({ voidedAt: new Date(), voidedBy: actorId, voidReason: reason }).where(eq(facilityCodes.id, id));
+      await this.audit.record({ actorUserId: actorId, action: 'danh_muc.huy_ma_co_so', entityType: 'facility', entityId: c.facilityId, ip, detail: { loai: c.scheme, ma: c.code, lyDo: reason } }, tx);
+    });
   }
 
   async createFacility(input: FacilityInput, actorId: string, ip: string | null) {
