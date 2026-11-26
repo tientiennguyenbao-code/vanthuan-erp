@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigserial,
   boolean,
+  check,
   index,
   inet,
   integer,
@@ -1176,12 +1177,10 @@ export const collectionSlips = pgTable(
     supplierPartnerId: uuid('supplier_partner_id')
       .notNull()
       .references(() => partners.id),
-    farmerId: uuid('farmer_id')
-      .notNull()
-      .references(() => farmers.id),
-    plotId: uuid('plot_id')
-      .notNull()
-      .references(() => plots.id),
+    /** Hàng từ thửa/ao: hộ và thửa; hàng khai thác: chuyến khai thác (một trong hai) */
+    farmerId: uuid('farmer_id').references(() => farmers.id),
+    plotId: uuid('plot_id').references(() => plots.id),
+    catchTripId: uuid('catch_trip_id').references(() => catchTrips.id),
     harvestDate: text('harvest_date').notNull(),
     quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
     moisturePct: numeric('moisture_pct', { precision: 5, scale: 2, mode: 'number' }),
@@ -1209,6 +1208,8 @@ export const collectionSlips = pgTable(
     uniqueIndex('collection_slips_code_uq').on(t.code),
     index('collection_slips_lot_idx').on(t.purchaseLotId),
     index('collection_slips_plot_idx').on(t.plotId, t.harvestDate),
+    index('collection_slips_trip_idx').on(t.catchTripId),
+    check('collection_slips_nguon_ck', sql`(${t.plotId} is not null and ${t.farmerId} is not null and ${t.catchTripId} is null) or (${t.plotId} is null and ${t.farmerId} is null and ${t.catchTripId} is not null)`),
   ],
 );
 
@@ -1390,3 +1391,77 @@ export const areaCodeSubmissions = pgTable(
   (t) => [index('area_code_submissions_area_idx').on(t.growingAreaId, t.status)],
 );
 export type AreaCodeSubmission = typeof areaCodeSubmissions.$inferSelect;
+
+/** Tàu cá của nhà cung cấp thủy sản khai thác: số đăng ký, giấy phép khai thác, nghề. Huỷ thay vì xoá. */
+export const fishingVessels = pgTable(
+  'fishing_vessels',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    supplierPartnerId: uuid('supplier_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    /** Số đăng ký tàu, ví dụ BĐ-96789-TS */
+    registrationNo: text('registration_no').notNull(),
+    name: text('name'),
+    ownerName: text('owner_name').notNull(),
+    flag: text('flag').notNull().default('VN'),
+    lengthM: numeric('length_m', { precision: 6, scale: 2, mode: 'number' }),
+    /** Nghề khai thác: lưới kéo, câu vàng, lưới vây... */
+    gear: text('gear').notNull(),
+    licenseNo: text('license_no'),
+    licenseValidUntil: text('license_valid_until'),
+    /** Có thiết bị giám sát hành trình (VMS) */
+    hasVms: boolean('has_vms').notNull().default(false),
+    note: text('note'),
+    source: text('source').notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+  },
+  (t) => [index('fishing_vessels_supplier_idx').on(t.supplierPartnerId)],
+);
+
+/**
+ * Một chuyến khai thác: ngày đi, ngày cập cảng, cảng cá, vùng khai thác, loài, sản lượng, và giấy chứng nhận / giấy
+ * xác nhận thủy sản khai thác (chống khai thác IUU). Phiếu thu gom từ chuyến không vượt sản lượng của chuyến.
+ */
+export const catchTrips = pgTable(
+  'catch_trips',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    vesselId: uuid('vessel_id')
+      .notNull()
+      .references(() => fishingVessels.id),
+    supplierPartnerId: uuid('supplier_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    departedOn: text('departed_on').notNull(),
+    landedOn: text('landed_on').notNull(),
+    landingPort: text('landing_port').notNull(),
+    /** Vùng khai thác: vùng biển, ô lưới, hoặc vùng FAO */
+    fishingArea: text('fishing_area').notNull(),
+    species: text('species').notNull(),
+    catchKg: numeric('catch_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    /** Số giấy chứng nhận / giấy xác nhận thủy sản khai thác */
+    certificateNo: text('certificate_no'),
+    certificateIssuer: text('certificate_issuer'),
+    certificateDate: text('certificate_date'),
+    note: text('note'),
+    source: text('source').notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+  },
+  (t) => [uniqueIndex('catch_trips_code_uq').on(t.code), index('catch_trips_vessel_idx').on(t.vesselId)],
+);
+export type CatchTrip = typeof catchTrips.$inferSelect;
+export type FishingVessel = typeof fishingVessels.$inferSelect;

@@ -9,6 +9,7 @@ import { NGANH } from '@/lib/nhan';
 import { banDo, CACH_KIEM_RUNG, docGeojson, ha, HinhThua, HoSoNguonCung, LOAI_THUA, LOAI_VUNG, NGUON_NHAP, NhanRung, taiGeojson, Thua } from '@/lib/nguon-cung';
 import { MaSoVung } from '@/lib/ma-vung';
 import { NhatKyThuoc } from '@/lib/nhat-ky-thuoc';
+import { TauCa } from '@/lib/tau-ca';
 import { UocTinhThua } from '@/lib/uoc-tinh';
 import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from '../../khung-trang';
@@ -262,6 +263,7 @@ export default function HoSoNhaCungCap() {
         </>
       )}
 
+      <TauCa duong={`/tau-ca/${id}`} goc="/tau-ca" doiTacId={id} />
       {dangDung.length > 0 && <NhatKyThuoc duong={`/nhat-ky-thuoc/${id}`} duongGhi="/nhat-ky-thuoc" duongHuy={(x) => `/nhat-ky-thuoc/${x}/huy`} />}
       {dangDung.length > 0 && <UocTinhThua duongDoc={`/ke-hoach-thu-mua/uoc-tinh/${id}`} duongGhi="/ke-hoach-thu-mua/uoc-tinh" />}
     </KhungTrang>

@@ -7,7 +7,7 @@ import { ngay, ngayGio } from './nhan';
 import { ha, TRANG_THAI_RUNG } from './nguon-cung';
 
 export interface PhieuThuGom {
-  id: string; code: string; farmerName: string; farmerCode: string; plotCode: string; harvestDate: string; quantityKg: number;
+  id: string; code: string; farmerName: string | null; farmerCode: string | null; plotCode: string | null; tripCode: string | null; vesselNo: string | null; harvestDate: string; quantityKg: number;
   moisturePct: number | null; weighTicketNo: string | null; eudrOk: boolean | null; eudrReasons: string[]; capKg: number | null; luuY: string[];
   source: string; note: string | null; createdByName: string; createdAt: string; voidedAt: string | null; voidReason: string | null;
 }
@@ -21,6 +21,7 @@ export interface DuLieuThuGom {
   phieu: PhieuThuGom[];
   ho: { id: string; code: string; fullName: string }[];
   thua: ThuaChon[];
+  chuyen?: { id: string; code: string; landedOn: string; species: string; vesselNo: string; coGiay: boolean; conLaiKg: number }[];
 }
 
 /** Nhãn EUDR của lô mua cà phê. */
@@ -42,7 +43,8 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
   const [d, setD] = useState<DuLieuThuGom | null>(null);
   const [loi, setLoi] = useState('');
   const [tb, setTb] = useState('');
-  const [f, setF] = useState({ farmerId: '', plotId: '', harvestDate: homNay(), quantityKg: '', moisturePct: '', weighTicketNo: '', note: '' });
+  const [tuChuyen, setTuChuyen] = useState(false);
+  const [f, setF] = useState({ catchTripId: '', farmerId: '', plotId: '', harvestDate: homNay(), quantityKg: '', moisturePct: '', weighTicketNo: '', note: '' });
   const [huy, setHuy] = useState<{ id: string; lyDo: string } | null>(null);
 
   const tai = useCallback(() => api<DuLieuThuGom>(duong).then(setD), [duong]);
@@ -68,8 +70,7 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
     lam(async () => {
       const r = await api<{ code: string; eudrOk: boolean | null; eudrReasons: string[]; luuY: string[] }>(duong, {
         body: {
-          farmerId: f.farmerId,
-          plotId: f.plotId,
+          ...(d && (d.chuyen?.length ?? 0) > 0 && (tuChuyen || d.ho.length === 0) ? { catchTripId: f.catchTripId } : { farmerId: f.farmerId, plotId: f.plotId }),
           harvestDate: f.harvestDate,
           quantityKg: so(f.quantityKg),
           moisturePct: f.moisturePct ? so(f.moisturePct) : null,
@@ -77,7 +78,7 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
           note: f.note.trim() || null,
         },
       });
-      setF({ ...f, plotId: '', quantityKg: '', moisturePct: '', weighTicketNo: '', note: '' });
+      setF({ ...f, plotId: '', catchTripId: '', quantityKg: '', moisturePct: '', weighTicketNo: '', note: '' });
       if (r.eudrOk === false) return `Đã ghi phiếu ${r.code}. Hàng chưa đủ EUDR: ${r.eudrReasons.join('; ')}.`;
       if (r.luuY.length) return `Đã ghi phiếu ${r.code}. Lưu ý: ${r.luuY.join('; ')}.`;
       return `Đã ghi phiếu ${r.code}.`;
@@ -88,6 +89,9 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
   const thuaCuaHo = d.thua.filter((t) => t.farmerId === f.farmerId);
   const thuaChon = d.thua.find((t) => t.id === f.plotId);
   const conHieuLuc = d.phieu.filter((p) => !p.voidedAt);
+  const coChuyen = (d.chuyen?.length ?? 0) > 0;
+  const dungChuyen = coChuyen && (tuChuyen || d.ho.length === 0);
+  const chuyenChon = d.chuyen?.find((c) => c.id === f.catchTripId);
 
   return (
     <section>
@@ -106,7 +110,35 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
       {d.duocGhi && (
         <form className="o" onSubmit={gui} style={{ maxWidth: 640, marginBottom: 12 }}>
           <strong>Ghi phiếu mới</strong>
-          {d.ho.length === 0 ? (
+          {coChuyen && (
+            <div style={{ margin: '8px 0' }}>
+              <label style={{ display: 'inline', marginRight: 16 }}><input type="radio" checked={!dungChuyen} onChange={() => setTuChuyen(false)} /> Hàng nuôi: hộ và ao</label>
+              <label style={{ display: 'inline' }}><input type="radio" checked={dungChuyen} onChange={() => setTuChuyen(true)} /> Hàng khai thác: chuyến tàu</label>
+            </div>
+          )}
+          {dungChuyen ? (
+            <div className="luoi">
+              <div>
+                <label htmlFor="pg-chuyen">Chuyến khai thác</label>
+                <select id="pg-chuyen" required value={f.catchTripId} onChange={(e) => { const c = d.chuyen!.find((x) => x.id === e.target.value); setF({ ...f, catchTripId: e.target.value, harvestDate: c && f.harvestDate < c.landedOn ? c.landedOn : f.harvestDate }); }}>
+                  <option value="">Chọn chuyến</option>
+                  {d.chuyen!.map((c) => <option key={c.id} value={c.id}>{c.code} · tàu {c.vesselNo} · {c.species} · còn {kg(c.conLaiKg)}{c.coGiay ? '' : ' · chưa có giấy khai thác'}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="pg-ngay2">Ngày nhận hàng</label>
+                <input id="pg-ngay2" type="date" required min={chuyenChon?.landedOn} max={homNay()} value={f.harvestDate} onChange={(e) => setF({ ...f, harvestDate: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="pg-kl2">Khối lượng cân (kg)</label>
+                <input id="pg-kl2" inputMode="decimal" required value={f.quantityKg} onChange={(e) => setF({ ...f, quantityKg: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="pg-so2">Số phiếu cân</label>
+                <input id="pg-so2" value={f.weighTicketNo} onChange={(e) => setF({ ...f, weighTicketNo: e.target.value })} />
+              </div>
+            </div>
+          ) : d.ho.length === 0 ? (
             <p className="phu">Nhà cung cấp chưa có nông hộ nào. Thêm hộ và thửa ở hồ sơ vùng trồng trước.</p>
           ) : (
             <div className="luoi">
@@ -146,7 +178,7 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
               </div>
             </div>
           )}
-          {thuaChon && (
+          {!dungChuyen && thuaChon && (
             <p className={thuaChon.capKg === null || thuaChon.coCanhBao || (d.lo.apDungEudr && thuaChon.forestStatus !== 'khong_rung') ? 'canh-bao-nhe' : 'phu'} style={{ marginTop: 8 }}>
               {thuaChon.capKg === null
                 ? 'Vùng này chưa có mức năng suất tối đa, nên hàng chưa được tính là đủ EUDR. Nhờ Ban Giám đốc đặt mức ở trang Năng suất tối đa.'
@@ -155,20 +187,23 @@ export function PhieuThuGomLo({ duong, duongHuy, onDoi }: { duong: string; duong
               {d.lo.apDungEudr && thuaChon.forestStatus !== 'khong_rung' && ` Thửa chưa có kết quả kiểm tra rừng "không rừng" đã duyệt (hiện: ${TRANG_THAI_RUNG[thuaChon.forestStatus]}), nên hàng chưa đủ EUDR.`}
             </p>
           )}
-          {d.ho.length > 0 && <button style={{ marginTop: 12 }}>Ghi phiếu</button>}
+          {(d.ho.length > 0 || dungChuyen) && <button style={{ marginTop: 12 }}>Ghi phiếu</button>}
         </form>
       )}
 
       <div className="bang-cuon">
         <table>
-          <thead><tr><th>Phiếu</th><th>Hộ</th><th>Thửa</th><th>Thu hoạch</th><th>Khối lượng</th>{d.lo.apDungEudr && <th>EUDR</th>}<th>Người ghi</th><th></th></tr></thead>
+          <thead><tr><th>Phiếu</th><th>Hộ{coChuyen || d.phieu.some((p) => p.tripCode) ? ' / tàu' : ''}</th><th>Thửa{coChuyen || d.phieu.some((p) => p.tripCode) ? ' / chuyến' : ''}</th><th>Thu hoạch</th><th>Khối lượng</th>{d.lo.apDungEudr && <th>EUDR</th>}<th>Người ghi</th><th></th></tr></thead>
           <tbody>
             {d.phieu.length === 0 && <tr><td colSpan={8} className="phu">Chưa có phiếu nào.</td></tr>}
             {d.phieu.map((p) => (
               <tr key={p.id} className={p.voidedAt ? 'huy' : ''}>
                 <td>{p.code}{p.weighTicketNo && <div className="phu">Phiếu cân {p.weighTicketNo}</div>}</td>
-                <td>{p.farmerName}<div className="phu">{p.farmerCode}</div></td>
-                <td>{p.plotCode}</td>
+                {p.tripCode ? (
+                  <><td><span className="phu">Tàu {p.vesselNo}</span></td><td>Chuyến {p.tripCode}</td></>
+                ) : (
+                  <><td>{p.farmerName}<div className="phu">{p.farmerCode}</div></td><td>{p.plotCode}</td></>
+                )}
                 <td>{ngay(p.harvestDate)}</td>
                 <td>{kg(p.quantityKg)}{p.moisturePct !== null && <div className="phu">ẩm {p.moisturePct}%</div>}{p.luuY.map((x) => <div key={x} className="canh-bao-nhe">{x}</div>)}</td>
                 {d.lo.apDungEudr && (

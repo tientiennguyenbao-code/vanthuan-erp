@@ -9,14 +9,16 @@ import { CollectionService } from './collection.service';
 import { ForestService } from './forest.service';
 
 const slipSchema = z.object({
-  farmerId: z.uuid(),
-  plotId: z.uuid(),
+  farmerId: z.uuid().nullish(),
+  plotId: z.uuid().nullish(),
+  /** Hàng khai thác: chuyến thay cho hộ và thửa */
+  catchTripId: z.uuid().nullish(),
   harvestDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày dạng YYYY-MM-DD'),
   quantityKg: z.number().positive('Khối lượng phải lớn hơn 0').max(1_000_000),
   moisturePct: z.number().min(0).max(100).nullish(),
   weighTicketNo: z.string().trim().max(60).nullish(),
   note: z.string().trim().max(300).nullish(),
-});
+}).refine((b) => (b.catchTripId ? !b.farmerId && !b.plotId : !!b.farmerId && !!b.plotId), { message: 'Chọn hộ và thửa, hoặc chọn chuyến khai thác', path: ['plotId'] });
 const voidSchema = z.object({ lyDo: z.string().trim().min(3, 'Ghi lý do huỷ').max(300) });
 const kgHa = z.number().positive().max(100_000).nullable();
 const yieldSchema = z.object({ ca_phe: kgHa, gia_vi: kgHa, thuy_san: kgHa });
