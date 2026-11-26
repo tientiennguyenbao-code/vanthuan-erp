@@ -16,6 +16,8 @@ const schema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   TOTP_ISSUER: z.string().default('Van Thuan Global'),
+  /** Thư mục lưu tệp chứng từ (đã mã hoá). Khi chạy thật thay bằng kho lưu trữ chuẩn S3 đặt tại Việt Nam. */
+  FILE_DIR: z.string().default('./data/tep'),
 });
 
 export type AppConfig = z.infer<typeof schema>;

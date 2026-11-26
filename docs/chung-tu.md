@@ -12,6 +12,14 @@ Theo "Thiết kế phân hệ Điều phối lô hàng và chứng từ" và b�
 - Lô môi giới: chứng từ "người xuất khẩu" tách theo từng nhà cung cấp (vì nhà cung cấp đứng tên xuất khẩu). Gom từ hai nhà cung cấp trở lên thì thêm thỏa thuận ủy quyền nhà cung cấp chính.
 - Nhân viên phụ trách cập nhật (chưa có, đang xin, có bản nháp + số chứng từ). Trưởng phòng KD duyệt; người cập nhật không tự duyệt. Sửa chứng từ đã duyệt thì phải duyệt lại.
 
+## Tệp chứng từ
+- Nhận PDF, JPG, PNG, tối đa 25 MB; loại tệp kiểm theo nội dung, không theo đuôi tên.
+- Mỗi tệp mã hoá bằng khoá riêng (khoá này khoá bằng APP_KEY) rồi mới lưu; ghi mã băm SHA-256 và người nộp.
+- Nộp lại tạo phiên bản mới, bản cũ giữ nguyên (cơ sở dữ liệu chặn sửa, xoá). Chứng từ đã duyệt mà nộp tệp mới thì phải duyệt lại.
+- Trưởng phòng chỉ duyệt được chứng từ đã có tệp.
+- Tải xuống qua đường dẫn tạm hết hạn sau 10 phút, chỉ người xin dùng được; mỗi lần tải ghi nhật ký.
+- Hiện lưu trên đĩa máy chủ (FILE_DIR). Khi chạy thật đổi sang kho chuẩn S3 đặt tại Việt Nam, có khoá chống xoá, và bật quét virus (cột scan_status đã có sẵn).
+
 ## Cổng chặn
 - Sang "xếp tàu": mọi chứng từ bắt buộc trước xếp tàu phải đã duyệt (hoặc đánh dấu không áp dụng, có lý do) và không hết hạn trước ngày tàu chạy.
 - Giám đốc có thể mở chặn một lần, bắt buộc ghi lý do; lưu vào nhật ký lô và nhật ký hệ thống.
@@ -22,4 +30,4 @@ Theo "Thiết kế phân hệ Điều phối lô hàng và chứng từ" và b�
 - Hợp đồng chưa có tỷ lệ phí thì đề nghị ở trạng thái "thiếu tỷ lệ". Kế toán trưởng duyệt.
 
 ## Chưa làm (phần sau)
-- Tải tệp chứng từ lên, cổng cho nhà cung cấp tự cập nhật, xuất Excel sang MISA AMIS.
+- Cổng cho nhà cung cấp tự cập nhật, xuất Excel sang MISA AMIS, quét virus, neo mã băm tệp lên blockchain.

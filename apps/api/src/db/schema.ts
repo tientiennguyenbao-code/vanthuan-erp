@@ -769,5 +769,34 @@ export const gateOverrides = pgTable('gate_overrides', {
   usedAt: timestamp('used_at', { withTimezone: true }),
 });
 
+/**
+ * Tệp đính kèm của một dòng chứng từ. Mỗi lần nộp là một phiên bản mới, bản cũ giữ nguyên
+ * (bảng chỉ ghi thêm). Nội dung tệp mã hoá bằng khoá riêng của tệp, khoá này khoá bằng APP_KEY.
+ */
+export const documentFiles = pgTable(
+  'document_files',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    lotDocumentId: uuid('lot_document_id')
+      .notNull()
+      .references(() => lotDocuments.id),
+    version: integer('version').notNull(),
+    fileName: text('file_name').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    /** Mã băm SHA-256 của nội dung gốc, dùng để kiểm chứng tệp không bị sửa */
+    sha256: text('sha256').notNull(),
+    storageKey: text('storage_key').notNull(),
+    keyEnc: text('key_enc').notNull(),
+    /** chua_quet | sach | nhiem (quét virus chạy trên máy chủ thật) */
+    scanStatus: text('scan_status').notNull().default('chua_quet'),
+    uploadedBy: uuid('uploaded_by')
+      .notNull()
+      .references(() => users.id),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('document_files_version_uq').on(t.lotDocumentId, t.version)],
+);
+
 export type DocRule = typeof docRules.$inferSelect;
 export type LotDocument = typeof lotDocuments.$inferSelect;

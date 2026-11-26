@@ -1,4 +1,6 @@
 import { INestApplication } from '@nestjs/common';
+import { Pool } from 'pg';
+import { PG_POOL } from '../src/db/db';
 import { codeFor, createUser, fullFirstLogin, startApp } from './helpers';
 
 type Agent = Awaited<ReturnType<typeof fullFirstLogin>>['agent'];
@@ -65,6 +67,8 @@ describe('Chứng từ: checklist theo thị trường, cổng xếp tàu, đề
     active(d)
       .map((x) => `${x.code}:${x.supplierPartnerId === ncc1 ? 'ncc1' : x.supplierPartnerId === ncc2 ? 'ncc2' : '-'}`)
       .sort();
+  const pdf = (text: string) => Buffer.from(`%PDF-1.4\n${text}\n%%EOF`);
+  const attach = (a: Agent, docId: string, text = 'ban scan', name = 'chung-tu.pdf') => a.post(`/api/chung-tu/${docId}/tep`).attach('tep', pdf(text), name);
   const advance = (body: Record<string, unknown> = {}) => nv.post(`/api/lo-xuat/${ids.lx}/chuyen-buoc`).send(body);
 
   beforeAll(async () => {
@@ -126,6 +130,9 @@ describe('Chứng từ: checklist theo thị trường, cổng xếp tàu, đề
     await nv.put(`/api/chung-tu/${hd.id}`).send({ trangThai: 'nhap' }).expect(400);
     await nv.put(`/api/chung-tu/${hd.id}`).send({ trangThai: 'nhap', so: 'INV-001' }).expect(204);
     await nv.post(`/api/chung-tu/${hd.id}/duyet`).expect(403);
+    const noFile = await tp.post(`/api/chung-tu/${hd.id}/duyet`).expect(400);
+    expect(noFile.body.message).toMatch(/tải tệp lên trước khi duyệt/);
+    await attach(nv, hd.id).expect(201);
     await tp.post(`/api/chung-tu/${hd.id}/duyet`).expect(204);
     expect(active(await docs()).find((x) => x.id === hd.id)!.status).toBe('da_duyet');
     await nv.put(`/api/chung-tu/${hd.id}`).send({ trangThai: 'nhap', so: 'INV-001A' }).expect(204);
@@ -139,6 +146,34 @@ describe('Chứng từ: checklist theo thị trường, cổng xếp tàu, đề
     expect(self.body.message).toMatch(/4 mắt/);
     await tp.post(`/api/chung-tu/${pk.id}/tra-lai`).send({ lyDo: 'Sai trọng lượng tịnh' }).expect(204);
     expect(active(await docs()).find((x) => x.id === pk.id)).toMatchObject({ status: 'dang_xin', note: 'Trả lại: Sai trọng lượng tịnh' });
+  });
+
+  it('tệp chứng từ: chỉ PDF hoặc ảnh, có phiên bản, nộp lại sau duyệt phải duyệt lại, tải qua đường dẫn tạm', async () => {
+    const hd = active(await docs()).find((x) => x.code === 'hoa_don' && x.supplierPartnerId === ncc2)!;
+    const exe = await nv.post(`/api/chung-tu/${hd.id}/tep`).attach('tep', Buffer.from('MZ chương trình'), 'hoa-don.pdf').expect(400);
+    expect(exe.body.message).toMatch(/PDF, JPG hoặc PNG/);
+    await nv.post(`/api/chung-tu/${hd.id}/tep`).expect(400);
+    await qt.post(`/api/chung-tu/${hd.id}/tep`).attach('tep', pdf('x'), 'a.pdf').expect(403);
+    const v1 = await attach(nv, hd.id, 'ban 1', '../../Hóa đơn KP.pdf').expect(201);
+    expect(v1.body).toMatchObject({ phienBan: 1, maBam: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    await nv.put(`/api/chung-tu/${hd.id}`).send({ trangThai: 'nhap', so: 'INV-KP-1' }).expect(204);
+    await tp.post(`/api/chung-tu/${hd.id}/duyet`).expect(204);
+    // Nộp bản mới sau khi đã duyệt: tạo phiên bản 2 và phải duyệt lại
+    expect((await attach(nv, hd.id, 'ban 2').expect(201)).body.phienBan).toBe(2);
+    const d = active(await docs(tp)).find((x) => x.id === hd.id)! as Doc & { tep: { id: string; phienBan: number; ten: string; maBam: string }[] };
+    expect(d.status).toBe('nhap');
+    expect(d.tep.map((t) => t.phienBan)).toEqual([2, 1]);
+    expect(d.tep[1].ten).toBe('Hóa đơn KP.pdf');
+
+    const link = await nv.post(`/api/tep/${d.tep[1].id}/lien-ket`).expect(200);
+    const file = await nv.get(link.body.duongDan).buffer(true).expect(200);
+    expect(file.headers['content-type']).toBe('application/pdf');
+    expect(Buffer.from(file.body).toString()).toContain('ban 1');
+    // Đường dẫn gắn với người xin; người khác dùng không được
+    await tp.get(link.body.duongDan).expect(403);
+    await qt.post(`/api/tep/${d.tep[1].id}/lien-ket`).expect(403);
+    await nv.get(link.body.duongDan.replace(/.$/, (c: string) => (c === 'A' ? 'B' : 'A'))).expect(403);
+    await tp.post(`/api/chung-tu/${hd.id}/duyet`).expect(204);
   });
 
   it('thiếu chứng từ thì chặn xếp tàu; Giám đốc mở chặn một lần, ghi lý do', async () => {
@@ -192,6 +227,7 @@ describe('Chứng từ: checklist theo thị trường, cổng xếp tàu, đề
       if (d.requirement !== 'bb' || d.status === 'da_gui' || d.status === 'khong_ap_dung') continue;
       if (d.status === 'da_duyet') await nv.post(`/api/chung-tu/${d.id}/da-gui`).expect(204);
       else if (d.status === 'nhap') {
+        await attach(nv, d.id);
         await tp.post(`/api/chung-tu/${d.id}/duyet`).expect(204);
         await nv.post(`/api/chung-tu/${d.id}/da-gui`).expect(204);
       } else await tp.post(`/api/chung-tu/${d.id}/khong-ap-dung`).send({ lyDo: 'Gom vào bộ của nhà cung cấp chính' }).expect(204);
@@ -199,5 +235,15 @@ describe('Chứng từ: checklist theo thị trường, cổng xếp tàu, đề
     expect((await advance().expect(200)).body.status).toBe('hoan_tat');
     const hd = active(await docs()).find((x) => x.code === 'hoa_don' && x.supplierPartnerId === ncc1)!;
     await nv.put(`/api/chung-tu/${hd.id}`).send({ trangThai: 'nhap', so: 'X-1' }).expect(400);
+  });
+
+  it('tệp đã nộp không sửa, không xoá được; tệp lưu trên đĩa đã mã hoá', async () => {
+    const pool = app.get<Pool>(PG_POOL);
+    const { rows } = await pool.query(`select id, storage_key from document_files limit 1`);
+    await expect(pool.query(`update document_files set file_name = 'x.pdf' where id = $1`, [rows[0].id])).rejects.toThrow(/chỉ được ghi thêm/);
+    await expect(pool.query(`delete from document_files where id = $1`, [rows[0].id])).rejects.toThrow(/chỉ được ghi thêm/);
+    await pool.query(`update document_files set scan_status = 'sach' where id = $1`, [rows[0].id]);
+    const raw = require('node:fs').readFileSync(require('node:path').join(process.env.FILE_DIR!, rows[0].storage_key)) as Buffer;
+    expect(raw.includes(Buffer.from('%PDF'))).toBe(false);
   });
 });

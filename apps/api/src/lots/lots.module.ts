@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { ContractsModule } from '../contracts/contracts.module';
-import { DocRulesController, DocumentsController, FeeRequestsController, LotDocumentsController } from './documents.controller';
+import { FILE_STORE, LocalFileStore } from '../documents/file-store';
+import { DocRulesController, DocumentsController, FeeRequestsController, FilesController, LotDocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { AllocationsController, ExportLotsController, PurchaseLotsController } from './lots.controller';
 import { LotsService } from './lots.service';
 
 @Module({
   imports: [AuditModule, ContractsModule],
-  controllers: [PurchaseLotsController, ExportLotsController, AllocationsController, LotDocumentsController, DocumentsController, DocRulesController, FeeRequestsController],
-  providers: [LotsService, DocumentsService],
+  controllers: [PurchaseLotsController, ExportLotsController, AllocationsController, LotDocumentsController, DocumentsController, DocRulesController, FeeRequestsController, FilesController],
+  providers: [LotsService, DocumentsService, { provide: FILE_STORE, useClass: LocalFileStore }],
 })
 export class LotsModule {}

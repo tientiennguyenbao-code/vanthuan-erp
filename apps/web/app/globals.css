@@ -77,3 +77,9 @@ textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--vien); borde
 .buoc li { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--vien); font-size: 13px; color: var(--chu-phu); }
 .buoc li.xong { border-color: var(--chinh); color: var(--chinh); }
 .buoc li.hien-tai { background: var(--chinh); border-color: var(--chinh); color: var(--the); font-weight: 600; }
+button.lien-ket { background: none; border: 0; padding: 0; color: var(--chinh); text-decoration: underline; font-weight: 400; text-align: left; }
+button.lien-ket:hover { background: none; color: var(--chinh-dam); }
+.nut-tep { display: inline-block; border: 1px solid var(--chinh); color: var(--chinh); border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 500; cursor: pointer; margin: 0; }
+.nut-tep { position: relative; }
+.nut-tep input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.nut-tep:focus-within { outline: 2px solid var(--chinh); outline-offset: 2px; }
