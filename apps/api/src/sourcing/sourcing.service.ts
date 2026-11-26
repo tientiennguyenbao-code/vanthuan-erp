@@ -5,7 +5,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { decrypt, encrypt, sha256Hex } from '../common/crypto';
 import { loadConfig } from '../config/config';
 import { DB, Db, DbExecutor } from '../db/db';
-import { farmers, growingAreas, partnerDocuments, partnerRoles, partners, partnerUsers, plots } from '../db/schema';
+import { farmers, growingAreas, partnerDocuments, plotForestChecks, partnerRoles, partners, partnerUsers, plots } from '../db/schema';
 import {
   AreaKind,
   centroid,
@@ -180,7 +180,7 @@ export class SourcingService {
       id: t.id, code: t.code, farmerId: t.farmerId, growingAreaId: t.growingAreaId, kind: t.kind, crop: t.crop, plantedYear: t.plantedYear,
       geometry: g, geometryType: t.geometryType, declaredAreaHa: t.declaredAreaHa, measuredAreaHa: t.measuredAreaHa, areaHa: t.areaHa,
       gpsAccuracyM: t.gpsAccuracyM, landDocType: t.landDocType, landDocNumber: t.landDocNumber, warnings: t.warnings as string[],
-      source: t.source, tam: { lat, lon }, voidedAt: t.voidedAt, voidReason: t.voidReason, createdAt: t.createdAt, updatedAt: t.updatedAt,
+      source: t.source, forestStatus: t.forestStatus, tam: { lat, lon }, voidedAt: t.voidedAt, voidReason: t.voidReason, createdAt: t.createdAt, updatedAt: t.updatedAt,
     };
   }
 
@@ -355,8 +355,11 @@ export class SourcingService {
         .set({
           geometry, geometryType: geometry.type === 'Point' ? 'diem' : 'da_giac', declaredAreaHa: declared, measuredAreaHa: check.measuredAreaHa, areaHa: check.areaHa,
           gpsAccuracyM: input.gpsAccuracyM ?? null, warnings, updatedAt: new Date(),
+          // Đo lại thì kết quả kiểm tra rừng cũ không còn khớp tọa độ
+          forestStatus: 'chua_kiem',
         })
         .where(eq(plots.id, plotId));
+      await tx.update(plotForestChecks).set({ status: 'het_hieu_luc' }).where(and(eq(plotForestChecks.plotId, plotId), eq(plotForestChecks.status, 'cho_duyet')));
       await this.audit.record(
         {
           actorUserId: ctx.user.id, action: 'nguon_cung.sua_toa_do', entityType: 'plot', entityId: t.id, ip,

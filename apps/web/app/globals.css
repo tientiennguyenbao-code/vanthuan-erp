@@ -105,3 +105,6 @@ details.o summary { cursor: pointer; font-weight: 600; }
 
 .nhan-eudr { background: var(--chinh); color: #fff; border-color: var(--chinh); }
 .nhan-khong-eudr { color: var(--loi); border-color: var(--loi); }
+.o-chon { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; }
+.o-chon label { display: flex; gap: 6px; align-items: center; font-weight: normal; margin: 0; }
+.o-chon input[type="checkbox"] { width: auto; }

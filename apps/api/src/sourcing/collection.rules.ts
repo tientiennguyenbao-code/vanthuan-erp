@@ -47,8 +47,10 @@ export function capRefusal(capKg: number | null, usedKg: number, quantityKg: num
 }
 
 /** Lý do hàng của phiếu chưa đủ điều kiện EUDR. Danh sách rỗng là đủ. */
-export function eudrReasons(input: { capKg: number | null; plotWarnings: string[] }): string[] {
+export function eudrReasons(input: { capKg: number | null; plotWarnings: string[]; forestStatus: string }): string[] {
   const out: string[] = [];
+  if (input.forestStatus === 'co_rung') out.push('Thửa có rừng bị chặt hoặc suy thoái sau 31/12/2020');
+  else if (input.forestStatus !== 'khong_rung') out.push('Thửa chưa có kết quả kiểm tra rừng đã được duyệt');
   if (input.capKg === null) out.push('Chưa có mức năng suất tối đa cho vùng này, nên chưa kiểm được sản lượng của thửa');
   if (input.plotWarnings.length > 0) out.push('Thửa còn cảnh báo chưa xử lý (chồng lấn hoặc diện tích lệch)');
   return out;
@@ -67,4 +69,21 @@ export function windowStart(harvestDate: string): string {
   const d = new Date(`${harvestDate}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - (CAP_WINDOW_DAYS - 1));
   return d.toISOString().slice(0, 10);
+}
+
+// ---------- Kiểm tra rừng ----------
+
+/** Cách kiểm: bản đồ rừng 2020 của JRC (EU), Global Forest Watch, khảo sát thực địa, hoặc cách khác có mô tả. */
+export const FOREST_METHODS = ['jrc_2020', 'gfw', 'khao_sat', 'khac'] as const;
+export const FOREST_RESULTS = ['khong_rung', 'co_rung'] as const;
+
+/**
+ * Duyệt kết quả kiểm tra rừng (4 mắt): người duyệt khác người kiểm, phiếu đang chờ,
+ * và tọa độ thửa chưa đổi kể từ lúc kiểm.
+ */
+export function forestReviewRefusal(check: { status: string; checkedBy: string; geometryHash: string }, reviewerId: string, currentGeometryHash: string): string | null {
+  if (check.status !== 'cho_duyet') return 'Kết quả này không còn chờ duyệt';
+  if (check.checkedBy === reviewerId) return 'Người kiểm không tự duyệt kết quả của mình';
+  if (check.geometryHash !== currentGeometryHash) return 'Thửa đã được đo lại sau khi kiểm, cần kiểm lại theo tọa độ mới';
+  return null;
 }

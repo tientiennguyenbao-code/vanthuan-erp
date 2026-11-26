@@ -18,7 +18,7 @@ export interface Ho {
 export interface Thua {
   id: string; code: string; farmerId: string; growingAreaId: string; kind: string; crop: string | null; plantedYear: number | null;
   geometry: HinhHoc; geometryType: string; declaredAreaHa: number | null; measuredAreaHa: number | null; areaHa: number; gpsAccuracyM: number | null;
-  landDocType: string | null; landDocNumber: string | null; warnings: string[]; source: string; tam: { lat: number; lon: number };
+  landDocType: string | null; landDocNumber: string | null; warnings: string[]; source: string; forestStatus: string; tam: { lat: number; lon: number };
   voidedAt: string | null; voidReason: string | null;
 }
 export interface HoSoNguonCung {
@@ -33,6 +33,13 @@ export interface HoSoNguonCung {
 export const LOAI_VUNG: Record<string, string> = { vung_trong: 'Vùng trồng', vung_nuoi: 'Vùng nuôi' };
 export const LOAI_THUA: Record<string, string> = { thua: 'Thửa đất', ao: 'Ao nuôi' };
 export const NGUON_NHAP: Record<string, string> = { noi_bo: 'Nhân viên nhập', cong_ncc: 'Nhà cung cấp nhập trên cổng', nhap_tep: 'Nhập từ tệp' };
+
+export const TRANG_THAI_RUNG: Record<string, string> = { chua_kiem: 'Chưa kiểm', cho_duyet: 'Chờ duyệt', khong_rung: 'Không rừng', co_rung: 'Có rừng sau 2020' };
+export const CACH_KIEM_RUNG: Record<string, string> = { jrc_2020: 'Bản đồ rừng 2020 của EU (JRC)', gfw: 'Global Forest Watch', khao_sat: 'Khảo sát thực địa', khac: 'Cách khác' };
+export function NhanRung({ s }: { s: string }) {
+  const cls = s === 'khong_rung' ? 'kyc-dat' : s === 'co_rung' ? 'kyc-canh-bao' : s === 'cho_duyet' ? 'canh-bao-nhe' : 'phu';
+  return <span className={cls}>{TRANG_THAI_RUNG[s] ?? s}</span>;
+}
 
 export const ha = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} ha`);
 export const banDo = (lat: number, lon: number) => `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;

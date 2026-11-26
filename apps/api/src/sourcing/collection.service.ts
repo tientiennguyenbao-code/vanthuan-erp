@@ -203,6 +203,7 @@ export class CollectionService {
           usedKg: da,
           conLaiKg: cap === null ? null : r2(Math.max(cap - da, 0)),
           coCanhBao: (r.p.warnings as string[]).length > 0,
+          forestStatus: r.p.forestStatus,
         };
       }),
     };
@@ -241,7 +242,7 @@ export class CollectionService {
       let reasons: string[] = [];
       let lotClass = lot.eudrClass;
       if (EUDR_SECTORS.includes(sector)) {
-        reasons = eudrReasons({ capKg: cap, plotWarnings: p.warnings as string[] });
+        reasons = eudrReasons({ capKg: cap, plotWarnings: p.warnings as string[], forestStatus: p.forestStatus });
         eudrOk = reasons.length === 0;
         const slipClass: EudrClass = eudrOk ? 'du' : 'khong_du';
         const refusal = classRefusal(lot.eudrClass, slipClass);
