@@ -11,6 +11,7 @@ export interface BaoGia {
   commodityId: string;
   commodityName?: string;
   sourceQuoteId: string | null;
+  inquiryId?: string | null;
   status: string;
   version: number;
   quantity: number;
@@ -41,6 +42,7 @@ export interface NhapBaoGia {
   doiTacId: string;
   matHangId: string;
   baoGiaNguonId: string | null;
+  hoiHangId?: string | null;
   soLuong: number;
   donVi: 'kg' | 'tan';
   donGia: number;

@@ -393,6 +393,8 @@ export const quotes = pgTable(
       .references(() => commodities.id),
     /** Báo giá mua làm nguồn (chỉ với báo giá bán) */
     sourceQuoteId: uuid('source_quote_id'),
+    /** Phiếu hỏi hàng sinh ra báo giá này (chỉ với báo giá bán) */
+    inquiryId: uuid('inquiry_id'),
     /** nhap | da_gui | chap_nhan | tu_choi | huy */
     status: text('status').notNull().default('nhap'),
     version: integer('version').notNull().default(1),
@@ -1465,3 +1467,108 @@ export const catchTrips = pgTable(
 );
 export type CatchTrip = typeof catchTrips.$inferSelect;
 export type FishingVessel = typeof fishingVessels.$inferSelect;
+
+// ============ Bán hàng: hỏi hàng, mẫu hàng ============
+
+/**
+ * Phiếu hỏi hàng: một yêu cầu của người mua (email, hội chợ, giới thiệu, cổng). Trạng thái:
+ * moi → dang_bao_gia (khi lập báo giá bán từ phiếu) → thang (khi báo giá được chấp nhận) | thua (ghi lý do) | huy.
+ * Phiếu mới quá 2 ngày làm việc chưa có báo giá thì bị đánh dấu quá hạn.
+ */
+export const inquiries = pgTable(
+  'inquiries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    partnerId: uuid('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    commodityId: uuid('commodity_id')
+      .notNull()
+      .references(() => commodities.id),
+    /** email | hoi_cho | gioi_thieu | website | cong | khac */
+    source: text('source').notNull(),
+    /** Ngày nhận yêu cầu (YYYY-MM-DD) */
+    receivedOn: text('received_on').notNull(),
+    quantity: numeric('quantity', { precision: 18, scale: 3, mode: 'number' }).notNull(),
+    unit: text('unit').notNull(),
+    spec: text('spec'),
+    certifications: text('certifications'),
+    /** Tháng giao mong muốn (YYYY-MM) */
+    deliveryMonth: text('delivery_month'),
+    incoterms: text('incoterms'),
+    portTo: text('port_to'),
+    targetPrice: numeric('target_price', { precision: 18, scale: 4, mode: 'number' }),
+    currency: text('currency'),
+    note: text('note'),
+    /** moi | dang_bao_gia | thang | thua | huy */
+    status: text('status').notNull().default('moi'),
+    /** gia | chat_luong | thoi_gian_giao | chung_nhan | khong_phan_hoi | khac */
+    lostReason: text('lost_reason'),
+    closeNote: text('close_note'),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('inquiries_code_uq').on(t.code), index('inquiries_partner_idx').on(t.partnerId), index('inquiries_owner_idx').on(t.ownerUserId)],
+);
+
+/**
+ * Mẫu hàng. chao_hang: gửi người mua trước khi chốt giá; truoc_xuat: lấy từ lô xuất, người mua duyệt trước khi
+ * xếp tàu; doi_chung: Vạn Thuận lưu lại để đối chiếu khi có khiếu nại (không gửi đi).
+ * Trạng thái: chuan_bi → da_gui → dat | khong_dat; doi_chung: luu; mọi loại có thể huy.
+ */
+export const samples = pgTable(
+  'samples',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    kind: text('kind').notNull(),
+    partnerId: uuid('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    commodityId: uuid('commodity_id')
+      .notNull()
+      .references(() => commodities.id),
+    inquiryId: uuid('inquiry_id').references(() => inquiries.id),
+    quoteId: uuid('quote_id').references(() => quotes.id),
+    exportLotId: uuid('export_lot_id').references(() => exportLots.id),
+    purchaseLotId: uuid('purchase_lot_id').references(() => purchaseLots.id),
+    weightG: integer('weight_g'),
+    description: text('description'),
+    status: text('status').notNull(),
+    courier: text('courier'),
+    trackingNo: text('tracking_no'),
+    sentOn: text('sent_on'),
+    /** Lưu mẫu đối chứng đến ngày */
+    retainUntil: text('retain_until'),
+    resultOn: text('result_on'),
+    /** Điểm thử nếm (cà phê, thang 100) */
+    cupScore: numeric('cup_score', { precision: 5, scale: 2, mode: 'number' }),
+    resultNote: text('result_note'),
+    resultBy: uuid('result_by').references(() => users.id),
+    cancelReason: text('cancel_reason'),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('samples_code_uq').on(t.code),
+    index('samples_inquiry_idx').on(t.inquiryId),
+    index('samples_export_lot_idx').on(t.exportLotId),
+    index('samples_partner_idx').on(t.partnerId),
+  ],
+);
+export type Inquiry = typeof inquiries.$inferSelect;
+export type Sample = typeof samples.$inferSelect;
