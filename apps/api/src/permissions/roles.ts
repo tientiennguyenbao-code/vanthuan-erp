@@ -55,6 +55,8 @@ export const PERMISSIONS = [
   'LO_HANG_XEM_TAT_CA',
   'LO_HANG_PHAN_CONG',
   'LO_HANG_QUAN_LY_CUA_MINH',
+  /** Mở cổng chặn xếp tàu khi thiếu chứng từ (bắt buộc ghi lý do). Chỉ Giám đốc. */
+  'LO_HANG_MO_CHAN',
   // Chứng từ
   'CHUNG_TU_XEM_TAT_CA',
   'CHUNG_TU_KIEM_TRA',
@@ -103,7 +105,7 @@ const BAN_GIAM_DOC: Permission[] = [
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  GIAM_DOC: [...BAN_GIAM_DOC, 'HOP_DONG_UY_QUYEN'],
+  GIAM_DOC: [...BAN_GIAM_DOC, 'HOP_DONG_UY_QUYEN', 'LO_HANG_MO_CHAN'],
   // Phó Giám đốc ký hợp đồng theo ủy quyền của Giám đốc: phân hệ hợp đồng kiểm tra văn bản
   // ủy quyền còn hiệu lực và hạn mức trước mỗi lần ký.
   PHO_GIAM_DOC: BAN_GIAM_DOC,

@@ -6,6 +6,7 @@ import { sha256Hex } from '../common/crypto';
 import { stableStringify } from '../common/stable-json';
 import { ContractsService } from '../contracts/contracts.service';
 import { DB, Db, DbExecutor } from '../db/db';
+import { DocumentsService } from './documents.service';
 import {
   bookings,
   commodities,
@@ -63,6 +64,7 @@ export class LotsService {
     @Inject(DB) private readonly db: Db,
     private readonly contractsService: ContractsService,
     private readonly audit: AuditService,
+    private readonly documents: DocumentsService,
   ) {}
 
   // ---------- Quyền ----------
@@ -400,6 +402,7 @@ export class LotsService {
         })
         .returning();
       await this.event({ exportLotId: lot.id, kind: 'tao', note: `Từ hợp đồng ${contract.code}` }, ctx, tx);
+      await this.documents.syncChecklist(lot, ctx, tx);
       await this.audit.record({ actorUserId: ctx.user.id, action: 'lo_xuat.tao', entityType: 'export_lot', entityId: lot.id, detail: { code, hopDong: contract.code } }, tx);
       return { id: lot.id, code };
     });
@@ -503,7 +506,7 @@ export class LotsService {
     const suppliers = new Set(active.map((x) => x.supplierId));
     const manage = this.canManage(lot, ctx);
     const open = lot.status !== 'da_huy' && lot.status !== 'hoan_tat';
-    const problems = gateProblems(g);
+    const problems = [...gateProblems(g), ...(await this.docGate(lot, this.db)).problems];
     const days = booking ? daysToCutoff([booking.cutoffSi, booking.cutoffCargo]) : null;
     return {
       ...lot,
@@ -569,6 +572,7 @@ export class LotsService {
         .values({ purchaseLotId: lot.id, exportLotId, quantityKg: r2(input.quantityKg), createdBy: ctx.user.id })
         .returning();
       await this.event({ exportLotId, purchaseLotId: lot.id, kind: 'phan_bo', quantityKg: input.quantityKg, note: `${lot.code} → ${exp.code}` }, ctx, tx);
+      await this.documents.syncChecklist(exp, ctx, tx);
       return { id: row.id };
     });
   }
@@ -597,6 +601,7 @@ export class LotsService {
       if (exp.status !== 'dong_goi') throw new BadRequestException('Chỉ huỷ phân bổ khi lô xuất đang ở bước đóng gói');
       await tx.update(lotAllocations).set({ cancelledAt: new Date(), cancelReason: reason }).where(eq(lotAllocations.id, id));
       await this.event({ exportLotId: a.exportLotId, purchaseLotId: a.purchaseLotId, kind: 'huy_phan_bo', quantityKg: a.quantityKg, note: reason }, ctx, tx);
+      await this.documents.syncChecklist(exp, ctx, tx);
     });
   }
 
@@ -648,7 +653,8 @@ export class LotsService {
       const lot = await this.lockExportLot(id, tx);
       this.assertCanManage(lot, ctx);
       const g = await this.gateInput(lot, tx);
-      const problems = gateProblems(g);
+      const doc = await this.docGate(lot, tx);
+      const problems = [...gateProblems(g), ...doc.problems];
       if (problems.length) throw new BadRequestException(`Chưa sang bước kế được: ${problems.join('; ')}`);
       const to = nextStep(lot.status as ExportLotStatus)!;
       const patch: Partial<ExportLot> = { status: to, updatedAt: new Date() };
@@ -658,6 +664,10 @@ export class LotsService {
         patch.shippedOn = input.shippedOn;
       }
       await tx.update(exportLots).set(patch).where(eq(exportLots.id, id));
+      if (to === 'xep_tau') {
+        if (doc.overridden) await this.documents.consumeOverride(id, tx);
+        await this.documents.createFeeRequests(lot, { number: input.blNumber!, date: input.shippedOn! }, tx);
+      }
       await this.event({ exportLotId: id, kind: 'chuyen_buoc', note: `${lot.status} → ${to}`, detail: to === 'xep_tau' ? { soVanDon: input.blNumber, ngayTauChay: input.shippedOn } : null }, ctx, tx);
       return { status: to };
     });
@@ -680,6 +690,14 @@ export class LotsService {
   }
 
   // ---------- Nội bộ ----------
+
+  /** Cổng chứng từ: trước khi xếp tàu (có thể được Giám đốc mở chặn) và trước khi hoàn tất. */
+  private async docGate(lot: ExportLot, exec: DbExecutor): Promise<{ problems: string[]; overridden: boolean }> {
+    const to = nextStep(lot.status as ExportLotStatus);
+    if (to === 'xep_tau') return this.documents.shippingProblems(lot, exec);
+    if (to === 'hoan_tat') return { problems: await this.documents.completionProblems(lot, exec), overridden: false };
+    return { problems: [], overridden: false };
+  }
 
   private async gateInput(lot: ExportLot, exec: DbExecutor) {
     const s = await this.contractsService.signedTerms(lot.counterContractId, exec);
