@@ -28,6 +28,8 @@ import {
 } from './contract.rules';
 import { LedgerService } from './ledger.service';
 import { SIGNATURE_PROVIDER, SignatureProvider } from './providers';
+import { activeLimit, buyerExposure, SALE_KINDS } from '../sales/credit-gate';
+import { creditProblems } from '../sales/credit.rules';
 
 export interface CreateContractInput {
   kind: ContractKind;
@@ -260,6 +262,7 @@ export class ContractsService {
         const [com] = await tx.select({ sector: commodities.sector }).from(commodities).where(eq(commodities.id, c.commodityId));
         if (com?.sector !== 'ca_phe') problems.push('Giá trừ lùi chỉ dùng cho cà phê');
       }
+      problems.push(...(await this.creditCheck(c, terms, tx)));
       if (problems.length) throw new BadRequestException(`Chưa trình ký được: ${problems.join('; ')}`);
       await this.assertPartiesUsable(c.kind as ContractKind, c.sellerPartnerId, c.buyerPartnerId, tx);
       const now = new Date();
@@ -663,7 +666,23 @@ export class ContractsService {
       }
     }
     await this.assertPartiesUsable(c.kind as ContractKind, c.sellerPartnerId, c.buyerPartnerId, tx);
+    const credit = await this.creditCheck(c, terms, tx);
+    if (credit.length) throw new BadRequestException(`Chưa ký được: ${credit.join('; ')}`);
     return { version, terms };
+  }
+
+  /** Hạn mức nợ người mua (BH-3): hợp đồng bán trả chậm không vượt hạn mức, người mua không có nợ quá hạn quá 30 ngày. */
+  private async creditCheck(c: Contract, terms: ContractTerms, exec: DbExecutor): Promise<string[]> {
+    if (!SALE_KINDS.includes(c.kind) || !c.buyerPartnerId || !terms.traChamNgay) return [];
+    const limit = await activeLimit(c.buyerPartnerId, exec);
+    const ex = await buyerExposure(c.buyerPartnerId, c.id, (x) => this.effectiveTerms(x, exec), exec);
+    return creditProblems({
+      deferredDays: terms.traChamNgay,
+      contractUsd: contractValueUsd(terms),
+      limit: limit ? { amountUsd: limit.amountUsd, maxDays: limit.maxDays } : null,
+      exposureUsd: ex.exposureUsd,
+      maxOverdueDays: ex.aging.maxOverdueDays,
+    });
   }
 
   /** Đối tác phải tồn tại, đúng vai (nhà cung cấp / người mua) và thẩm định còn đạt. */

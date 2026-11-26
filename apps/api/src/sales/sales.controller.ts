@@ -4,6 +4,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators';
 import { parseBody } from '../common/validation';
 import { CURRENCIES, INCOTERMS, UNITS } from '../contracts/contract.rules';
+import { CreditService } from './credit.service';
 import { InquiriesService } from './inquiries.service';
 import { PriceFixingService } from './price-fixing.service';
 import { INQUIRY_SOURCES, LOST_REASONS, SAMPLE_KINDS } from './sales.rules';
@@ -215,5 +216,42 @@ export class ContractProgressController {
   @Get()
   async get(@Param('id', ParseUUIDPipe) id: string, @CurrentAuth() ctx: AuthContext) {
     return { thucHien: await this.fixing.contractProgress(id, ctx) };
+  }
+}
+
+const limitSchema = z.object({
+  hanMucUsd: z.number().min(0).max(1e10),
+  soNgayToiDa: z.number().int().min(1, 'Số ngày từ 1').max(365),
+  lyDo: z.string().trim().min(3, 'Ghi lý do đề xuất').max(1000),
+});
+const decideSchema = z.object({ dongY: z.boolean(), ghiChu: optText(500) });
+
+/** Công nợ và hạn mức nợ của người mua. */
+@Controller('cong-no')
+export class CreditController {
+  constructor(private readonly credit: CreditService) {}
+
+  @Get()
+  list(@CurrentAuth() ctx: AuthContext) {
+    return this.credit.list(ctx);
+  }
+
+  @Get(':partnerId')
+  get(@Param('partnerId', ParseUUIDPipe) partnerId: string, @CurrentAuth() ctx: AuthContext) {
+    return this.credit.get(partnerId, ctx);
+  }
+
+  @Post(':partnerId/han-muc')
+  propose(@Param('partnerId', ParseUUIDPipe) partnerId: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
+    const b = parseBody(limitSchema, body);
+    return this.credit.propose(partnerId, { amountUsd: b.hanMucUsd, maxDays: b.soNgayToiDa, reason: b.lyDo }, ctx);
+  }
+
+  @Post('han-muc/:id/quyet-dinh')
+  @HttpCode(200)
+  async decide(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
+    const b = parseBody(decideSchema, body);
+    await this.credit.decide(id, { approve: b.dongY, note: b.ghiChu }, ctx);
+    return { ok: true };
   }
 }

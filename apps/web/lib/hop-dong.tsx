@@ -24,6 +24,8 @@ export interface DieuKhoan {
   duyetMauTruocXuat?: boolean | null;
   /** Cà phê bán theo giá trừ lùi: giá sàn kỳ hạn + chênh lệch (USD/tấn) */
   giaTruLui?: { san: 'ICE_LONDON' | 'ICE_NY'; kyHan: string; chenhLech: number } | null;
+  /** Bán trả chậm: người mua trả sau số ngày này kể từ ngày tàu chạy (cần hạn mức nợ) */
+  traChamNgay?: number | null;
 }
 
 export const DIEU_KHOAN_TRONG: DieuKhoan = {
@@ -123,6 +125,15 @@ function DieuKhoanBan({ v, doi }: { v: DieuKhoan; doi: (v: DieuKhoan) => void })
             <span className={lech ? 'kyc-canh-bao' : 'phu'}>Tổng các đợt {tong.toLocaleString('vi-VN')} {dv}{lech ? `, phải bằng ${v.soLuong.toLocaleString('vi-VN')} ${dv}` : ''}</span>
           </div>
         </>
+      )}
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+        <input type="checkbox" style={{ width: 'auto' }} checked={!!v.traChamNgay} onChange={(e) => doi({ ...v, traChamNgay: e.target.checked ? 30 : null })} />
+        Bán trả chậm (chỉ hợp đồng bán mua đứt; cần hạn mức nợ Giám đốc đã duyệt)
+      </label>
+      {!!v.traChamNgay && (
+        <div className="hang">
+          <div><label htmlFor="tcn">Người mua trả sau ngày tàu chạy (ngày)</label><input id="tcn" inputMode="numeric" value={v.traChamNgay} onChange={(e) => doi({ ...v, traChamNgay: Number(e.target.value) || null })} /></div>
+        </div>
       )}
       <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
         <input type="checkbox" style={{ width: 'auto' }} checked={!!v.duyetMauTruocXuat} onChange={(e) => doi({ ...v, duyetMauTruocXuat: e.target.checked || null })} />

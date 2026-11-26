@@ -46,3 +46,12 @@ Dùng chung quyền với báo giá: nhân viên kinh doanh thấy và sửa phi
 ## Quyền
 
 Xem: người xem được lô (`LO_HANG_XEM_TAT_CA`), cấp quản lý bán hàng (`HOP_DONG_XEM_TAT_CA`) hoặc người phụ trách lô. Chốt giá và huỷ chốt: `LO_HANG_PHAN_CONG`, `HOP_DONG_SOAN_TAT_CA`, hoặc người phụ trách lô có quyền quản lý lô của mình.
+
+# Bước 3: hạn mức nợ và tuổi nợ người mua (BH-3)
+
+- Hợp đồng bán mua đứt (`ban`) có thể đánh dấu trả chậm: `traChamNgay` là số ngày người mua trả sau ngày tàu chạy. Hợp đồng môi giới không tính vì người mua trả thẳng nhà cung cấp.
+- Hạn mức nợ (`credit_limits`): Kế toán trưởng đề xuất (`HAN_MUC_DE_XUAT`), Giám đốc duyệt hoặc từ chối (`HAN_MUC_DUYET`, từ chối phải ghi lý do, người đề xuất không tự duyệt). Dòng được duyệt mới nhất có hiệu lực. Chưa có hạn mức thì là 0.
+- Dư nợ = các khoản tiền hàng người mua đã lên lịch thu mà chưa thu (quy USD) + giá trị các hợp đồng bán trả chậm đã trình hoặc đã ký nhưng chưa lên lịch thu khoản nào.
+- Tuổi nợ theo ngày đến hạn của từng khoản: chưa đến hạn, quá 1–30, 31–60, 61–90, trên 90 ngày, chưa có ngày đến hạn.
+- Trình ký và ký hợp đồng trả chậm bị chặn khi: chưa có hạn mức; số ngày trả chậm vượt số ngày được duyệt; dư nợ cộng hợp đồng này vượt hạn mức; hoặc người mua có khoản quá hạn trên 30 ngày. Hợp đồng thanh toán trước hoặc theo chứng từ không bị chặn.
+- Trang `/ban-hang/cong-no` (quyền `CONG_NO_XEM`: Ban Giám đốc, Kế toán trưởng, kế toán viên, Trưởng phòng KD) và trang chi tiết từng người mua.

@@ -36,6 +36,7 @@ const termsSchema = z
       .max(24, 'Tối đa 24 đợt')
       .nullish(),
     duyetMauTruocXuat: z.boolean().nullish(),
+    traChamNgay: z.number().int().min(1, 'Số ngày trả chậm từ 1').max(365).nullish(),
     giaTruLui: z
       .object({ san: z.enum(FUTURES_MARKETS), kyHan: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Kỳ hạn dạng YYYY-MM'), chenhLech: z.number().min(-10000).max(10000) })
       .nullish(),
@@ -49,6 +50,7 @@ const termsSchema = z
       dotGiao: t.dotGiao?.length ? t.dotGiao : undefined,
       duyetMauTruocXuat: t.duyetMauTruocXuat ? true : undefined,
       giaTruLui: t.giaTruLui ?? undefined,
+      traChamNgay: t.traChamNgay ?? undefined,
     }),
   );
 

@@ -144,6 +144,7 @@ export default function ChiTietHopDong() {
             {t.giaTruLui && (
               <tr><th>Giá trừ lùi</th><td>Sàn {t.giaTruLui.san === 'ICE_NY' ? 'ICE New York' : 'ICE London'} kỳ hạn {t.giaTruLui.kyHan.slice(5)}/{t.giaTruLui.kyHan.slice(0, 4)}, chênh lệch {t.giaTruLui.chenhLech > 0 ? '+' : ''}{t.giaTruLui.chenhLech} USD/tấn. Đơn giá trên là giá tạm tính.</td></tr>
             )}
+            {t.traChamNgay && <tr><th>Trả chậm</th><td>Người mua trả sau {t.traChamNgay} ngày kể từ ngày tàu chạy (tính vào hạn mức nợ)</td></tr>}
             {t.duyetMauTruocXuat && <tr><th>Mẫu trước xuất</th><td>Người mua duyệt mẫu trước khi xếp tàu</td></tr>}
             <tr><th>Thanh toán</th><td>{t.dieuKhoanThanhToan || '—'}</td></tr>
             <tr><th>Ghi chú, quy cách</th><td style={{ whiteSpace: 'pre-wrap' }}>{t.ghiChu || '—'}</td></tr>
