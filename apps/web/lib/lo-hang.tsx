@@ -45,6 +45,13 @@ export const SU_KIEN_LO: Record<string, string> = {
   gui_chung_tu: 'Gửi chứng từ',
   khong_ap_dung: 'Chứng từ không áp dụng',
   mo_chan: 'Giám đốc mở chặn xếp tàu',
+  thanh_toan: 'Ghi nhận thu chi',
+  tai_tro: 'Tài trợ ngân hàng',
+  khieu_nai_mo: 'Mở khiếu nại',
+  khieu_nai_dong: 'Đóng khiếu nại',
+  quyet_toan_lap: 'Lập quyết toán',
+  quyet_toan_duyet: 'Duyệt quyết toán',
+  quyet_toan_tra_lai: 'Trả lại quyết toán',
 };
 
 export function kg(v: number | null | undefined): string {

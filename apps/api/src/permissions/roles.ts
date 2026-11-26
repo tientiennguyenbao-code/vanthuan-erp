@@ -70,6 +70,20 @@ export const PERMISSIONS = [
   'PHI_LAP_DE_NGHI_THU',
   'PHI_DUYET_DE_NGHI_THU',
   'KE_TOAN_XUAT_MISA',
+  // Thanh toán, tài trợ, khiếu nại, quyết toán
+  /** Lập lịch thu chi theo lô, ghi nhận tiền thực thu thực chi, ghi khoản tài trợ ngân hàng */
+  'THANH_TOAN_GHI_NHAN',
+  /** Cho trả nhà cung cấp vượt số đã thu của người mua (mua đứt). Chỉ Giám đốc. */
+  'THANH_TOAN_DUYET_VUOT',
+  /** Mở khiếu nại sau giao hàng (thay mặt người mua) */
+  'KHIEU_NAI_MO',
+  /** Kết luận lỗi, số tiền giảm trừ, chuyển trách nhiệm cho nhà cung cấp và đóng khiếu nại */
+  'KHIEU_NAI_GIAI_QUYET',
+  'QUYET_TOAN_LAP',
+  /** Kế toán trưởng duyệt quyết toán lô */
+  'QUYET_TOAN_DUYET',
+  /** Giám đốc duyệt thêm khi lô lỗ hoặc biên thấp hơn dự toán quá 10% */
+  'QUYET_TOAN_DUYET_GD',
   // Đối tác
   'DOI_TAC_XEM',
   /** Tạo, sửa đối tác do mình phụ trách */
@@ -102,10 +116,11 @@ const BAN_GIAM_DOC: Permission[] = [
   'DOI_TAC_DUYET_RUI_RO_CAO',
   'DANH_MUC_QUAN_LY',
   'NHAT_KY_XEM',
+  'KHIEU_NAI_GIAI_QUYET',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  GIAM_DOC: [...BAN_GIAM_DOC, 'HOP_DONG_UY_QUYEN', 'LO_HANG_MO_CHAN'],
+  GIAM_DOC: [...BAN_GIAM_DOC, 'HOP_DONG_UY_QUYEN', 'LO_HANG_MO_CHAN', 'THANH_TOAN_DUYET_VUOT', 'QUYET_TOAN_DUYET_GD'],
   // Phó Giám đốc ký hợp đồng theo ủy quyền của Giám đốc: phân hệ hợp đồng kiểm tra văn bản
   // ủy quyền còn hiệu lực và hạn mức trước mỗi lần ký.
   PHO_GIAM_DOC: BAN_GIAM_DOC,
@@ -118,6 +133,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'PHI_XEM_TAT_CA',
     'PHI_DUYET_DE_NGHI_THU',
     'KE_TOAN_XUAT_MISA',
+    'THANH_TOAN_GHI_NHAN',
+    'QUYET_TOAN_LAP',
+    'QUYET_TOAN_DUYET',
     'DOI_TAC_XEM',
   ],
   TRUONG_PHONG_KD: [
@@ -134,6 +152,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'DOI_TAC_QUAN_LY_TAT_CA',
     'DOI_TAC_DUYET',
     'DANH_MUC_QUAN_LY',
+    'KHIEU_NAI_MO',
+    'KHIEU_NAI_GIAI_QUYET',
   ],
   NHAN_VIEN_KD: [
     'HOP_DONG_SOAN_CUA_MINH',
@@ -143,6 +163,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'DOI_TAC_XEM',
     'DOI_TAC_QUAN_LY',
     'DOI_TAC_MOI_CONG',
+    'KHIEU_NAI_MO',
   ],
   KE_TOAN_VIEN: [
     'HOP_DONG_XEM_TAT_CA',
@@ -151,6 +172,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'PHI_XEM_TAT_CA',
     'PHI_LAP_DE_NGHI_THU',
     'KE_TOAN_XUAT_MISA',
+    'THANH_TOAN_GHI_NHAN',
+    'QUYET_TOAN_LAP',
     'DOI_TAC_XEM',
   ],
   // Quản trị hệ thống chỉ quản lý tài khoản, không xem nội dung nghiệp vụ.

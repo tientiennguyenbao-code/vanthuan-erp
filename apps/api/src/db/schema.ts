@@ -833,3 +833,175 @@ export const partnerUsers = pgTable('partner_users', {
 
 export type DocRule = typeof docRules.$inferSelect;
 export type LotDocument = typeof lotDocuments.$inferSelect;
+
+// ============ Thanh toán, tài trợ, khiếu nại, quyết toán ============
+
+/**
+ * Khoản tài trợ ngân hàng gắn với một lô xuất (tài trợ trước xuất khẩu, L/C, hàng lưu kho, chiết khấu).
+ * Phí thu xếp vốn = tỷ lệ × số tiền tài trợ, bên vay trả, thu khi ngân hàng giải ngân.
+ */
+export const financings = pgTable(
+  'financings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    bankPartnerId: uuid('bank_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    borrowerPartnerId: uuid('borrower_partner_id')
+      .notNull()
+      .references(() => partners.id),
+    /** truoc_xuat_khau | lc | luu_kho | chiet_khau */
+    kind: text('kind').notNull(),
+    amount: numeric('amount', { precision: 18, scale: 2, mode: 'number' }).notNull(),
+    currency: text('currency').notNull(),
+    fxPerUsd: numeric('fx_per_usd', { precision: 18, scale: 4, mode: 'number' }),
+    feeRatePct: numeric('fee_rate_pct', { precision: 6, scale: 3, mode: 'number' }).notNull(),
+    /** du_kien | da_giai_ngan | da_tat_toan | da_huy */
+    status: text('status').notNull().default('du_kien'),
+    disbursedOn: text('disbursed_on'),
+    dueOn: text('due_on').notNull(),
+    repaidOn: text('repaid_on'),
+    collateral: text('collateral'),
+    note: text('note'),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('financings_lot_idx').on(t.exportLotId)],
+);
+
+/**
+ * Lịch thu chi theo lô: mỗi dòng là một khoản dự kiến, đến hạn theo sự kiện của lô (mốc), và được ghi
+ * "đã thực hiện" khi tiền thực về hoặc thực chi (kèm tỷ giá lúc đó). Với lô môi giới, tiền hàng người mua
+ * trả thẳng cho nhà cung cấp: dòng đó chỉ để theo dõi và do nhà cung cấp xác nhận đã nhận trên cổng.
+ */
+export const lotPayments = pgTable(
+  'lot_payments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    purchaseLotId: uuid('purchase_lot_id').references(() => purchaseLots.id),
+    financingId: uuid('financing_id').references(() => financings.id),
+    /** thu | chi | theo_doi */
+    direction: text('direction').notNull(),
+    /** tien_hang_nguoi_mua | tien_hang_ncc | tien_hang_truc_tiep | phi_tron_goi | phi_thu_xep_von | tra_ngan_hang | chi_phi */
+    kind: text('kind').notNull(),
+    /** Hạng mục chi phí (giống dòng chi phí của báo giá) */
+    category: text('category'),
+    partnerId: uuid('partner_id').references(() => partners.id),
+    /** dat_coc | giam_dinh | van_don | chung_tu | giai_ngan | ngay */
+    milestone: text('milestone').notNull(),
+    dueDate: text('due_date'),
+    plannedAmount: numeric('planned_amount', { precision: 18, scale: 2, mode: 'number' }).notNull(),
+    currency: text('currency').notNull(),
+    /** du_kien | da_thuc_hien | da_huy */
+    status: text('status').notNull().default('du_kien'),
+    paidAmount: numeric('paid_amount', { precision: 18, scale: 2, mode: 'number' }),
+    paidOn: text('paid_on'),
+    /** Tỷ giá thực tế lúc thu, chi (số đơn vị tiền đổi được 1 USD) */
+    fxPerUsd: numeric('fx_per_usd', { precision: 18, scale: 4, mode: 'number' }),
+    reference: text('reference'),
+    note: text('note'),
+    /** Giám đốc cho trả nhà cung cấp vượt số đã thu (mua đứt) */
+    overpayApprovedBy: uuid('overpay_approved_by').references(() => users.id),
+    overpayApprovedAt: timestamp('overpay_approved_at', { withTimezone: true }),
+    overpayReason: text('overpay_reason'),
+    recordedBy: uuid('recorded_by').references(() => users.id),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('lot_payments_lot_idx').on(t.exportLotId), index('lot_payments_partner_idx').on(t.partnerId)],
+);
+
+/**
+ * Khiếu nại sau giao hàng. Lỗi xác định đối chiếu kết quả giám định cảng đi. Kết quả là số tiền giảm trừ
+ * cho người mua (ghi bằng phụ lục hợp đồng đối ứng); lỗi hàng hoá chuyển một phần hoặc toàn bộ sang nhà cung cấp.
+ */
+export const complaints = pgTable(
+  'complaints',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    /** so_luong | chat_luong | chung_tu | cham_giao */
+    kind: text('kind').notNull(),
+    description: text('description').notNull(),
+    claimedAmount: numeric('claimed_amount', { precision: 18, scale: 2, mode: 'number' }),
+    currency: text('currency').notNull(),
+    evidence: text('evidence'),
+    /** mo | da_dong */
+    status: text('status').notNull().default('mo'),
+    /** ncc | van_chuyen | nguoi_mua | van_thuan | khong_co_loi */
+    fault: text('fault'),
+    agreedAmount: numeric('agreed_amount', { precision: 18, scale: 2, mode: 'number' }),
+    passBackPurchaseLotId: uuid('pass_back_purchase_lot_id').references(() => purchaseLots.id),
+    passBackAmount: numeric('pass_back_amount', { precision: 18, scale: 2, mode: 'number' }),
+    amendmentRef: text('amendment_ref'),
+    resolution: text('resolution'),
+    openedBy: uuid('opened_by')
+      .notNull()
+      .references(() => users.id),
+    openedAt: timestamp('opened_at', { withTimezone: true }).notNull().defaultNow(),
+    closedBy: uuid('closed_by').references(() => users.id),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('complaints_code_uq').on(t.code), index('complaints_lot_idx').on(t.exportLotId)],
+);
+
+/**
+ * Quyết toán lô xuất: kế toán lập khi đủ 6 điều kiện, Kế toán trưởng duyệt; Giám đốc duyệt thêm khi lô lỗ
+ * hoặc biên thấp hơn dự toán quá 10%. Nội dung chốt dạng ảnh chụp kèm mã băm, ghi vào sổ cái hợp đồng đối ứng.
+ * Mỗi lô chỉ có một bản đang hiệu lực (bản bị trả lại thì lập bản mới).
+ */
+export const settlements = pgTable(
+  'settlements',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    /** cho_ktt | cho_gd | da_duyet | tra_lai */
+    status: text('status').notNull(),
+    data: jsonb('data').notNull(),
+    contentHash: text('content_hash').notNull(),
+    marginUsd: numeric('margin_usd', { precision: 18, scale: 2, mode: 'number' }).notNull(),
+    marginPct: numeric('margin_pct', { precision: 8, scale: 3, mode: 'number' }),
+    estimateMarginPct: numeric('estimate_margin_pct', { precision: 8, scale: 3, mode: 'number' }),
+    /** bao_gia | nhap_tay */
+    estimateSource: text('estimate_source'),
+    needsDirector: boolean('needs_director').notNull(),
+    directorReason: text('director_reason'),
+    note: text('note'),
+    preparedBy: uuid('prepared_by')
+      .notNull()
+      .references(() => users.id),
+    preparedAt: timestamp('prepared_at', { withTimezone: true }).notNull().defaultNow(),
+    chiefAccountantBy: uuid('chief_accountant_by').references(() => users.id),
+    chiefAccountantAt: timestamp('chief_accountant_at', { withTimezone: true }),
+    directorBy: uuid('director_by').references(() => users.id),
+    directorAt: timestamp('director_at', { withTimezone: true }),
+    returnedBy: uuid('returned_by').references(() => users.id),
+    returnedAt: timestamp('returned_at', { withTimezone: true }),
+    returnReason: text('return_reason'),
+  },
+  (t) => [index('settlements_lot_idx').on(t.exportLotId), uniqueIndex('settlements_active_uq').on(t.exportLotId).where(sql`${t.status} <> 'tra_lai'`)],
+);
+
+export type Financing = typeof financings.$inferSelect;
+export type LotPayment = typeof lotPayments.$inferSelect;
+export type Complaint = typeof complaints.$inferSelect;
+export type Settlement = typeof settlements.$inferSelect;

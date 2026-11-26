@@ -366,7 +366,7 @@ export class ContractsService {
   }
 
   /** Ghi một sự kiện ngoài vòng đời hợp đồng (ví dụ nhà cung cấp đồng ý chia lô) vào sổ cái của hợp đồng. */
-  async appendLedgerEvent(contractId: string, event: 'ncc_dong_y_chia_lo', contentHash: string, note: string, ctx: AuthContext, tx: DbExecutor) {
+  async appendLedgerEvent(contractId: string, event: 'ncc_dong_y_chia_lo' | 'khieu_nai' | 'quyet_toan', contentHash: string, note: string, ctx: AuthContext, tx: DbExecutor) {
     const c = await this.findContract(contractId, tx);
     await this.ledger.append({ contractId, version: c.signedVersion ?? c.currentVersion, event, actorUserId: ctx.user.id, contentHash, note }, tx);
   }

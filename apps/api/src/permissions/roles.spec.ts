@@ -32,6 +32,18 @@ describe('Bảng phân quyền', () => {
     expect(permissionsFor(['KE_TOAN_VIEN'])).toContain('PHI_LAP_DE_NGHI_THU');
   });
 
+  it('thanh toán và quyết toán: kế toán ghi nhận và lập; Kế toán trưởng duyệt; chỉ Giám đốc duyệt thêm và cho trả vượt', () => {
+    for (const r of ROLES) {
+      const p = permissionsFor([r]);
+      expect(p.includes('THANH_TOAN_GHI_NHAN')).toBe(r === 'KE_TOAN_VIEN' || r === 'KE_TOAN_TRUONG');
+      expect(p.includes('QUYET_TOAN_DUYET')).toBe(r === 'KE_TOAN_TRUONG');
+      expect(p.includes('QUYET_TOAN_DUYET_GD')).toBe(r === 'GIAM_DOC');
+      expect(p.includes('THANH_TOAN_DUYET_VUOT')).toBe(r === 'GIAM_DOC');
+    }
+    expect(permissionsFor(['NHAN_VIEN_KD'])).toContain('KHIEU_NAI_MO');
+    expect(permissionsFor(['NHAN_VIEN_KD'])).not.toContain('KHIEU_NAI_GIAI_QUYET');
+  });
+
   it('đối tác không có quyền nội bộ nào', () => {
     expect(permissionsFor(['NHA_CUNG_CAP', 'NGUOI_MUA'])).toEqual([]);
   });

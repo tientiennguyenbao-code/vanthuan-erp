@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ChecklistChungTu } from '@/lib/chung-tu';
+import { KhieuNaiLo, QuyetToanLo, ThuChiLo } from '@/lib/thanh-toan';
 import { CacBuoc, Den, kg, LOAI_GIAO_DICH, NhatKy, SuKienLo, THI_TRUONG, TRANG_THAI_LO_XUAT } from '@/lib/lo-hang';
 import { ngay, ngayGio } from '@/lib/nhan';
 import { useToi } from '@/lib/use-toi';
@@ -88,6 +89,7 @@ export default function ChiTietLoXuat() {
   const [bk, setBk] = useState({ hangTau: '', soBooking: '', tauChuyen: '', cutoffSi: '', cutoffVgm: '', cutoffHang: '', container: '' });
   const [vd, setVd] = useState({ soVanDon: '', ngayTauChay: '' });
   const [lyDo, setLyDo] = useState('');
+  const [doiTien, setDoiTien] = useState(0);
 
   const tai = useCallback(async () => {
     const r = await api<LoXuat>(`/lo-xuat/${id}`);
@@ -322,6 +324,21 @@ export default function ChiTietLoXuat() {
       )}
       {lo.blNumber && (
         <p style={{ marginTop: 16 }}><Link href={`/lo-hang/thu-phi?loXuatId=${lo.id}`}>Đề nghị thu phí của lô này</Link></p>
+      )}
+
+      {lo.status !== 'da_huy' && toi.quyen.some((q) => q === 'PHI_XEM_TAT_CA' || q === 'PHI_XEM_CUA_MINH') && (
+        <>
+          <h2>Thu chi và tài trợ</h2>
+          <ThuChiLo key={`tc${doiTien}`} loId={lo.id} loaiGiaoDich={lo.dealType} loMua={lo.phanBo} />
+          {(lo.status === 'xep_tau' || lo.status === 'hoan_tat') && (
+            <>
+              <h2>Khiếu nại sau giao hàng</h2>
+              <KhieuNaiLo loId={lo.id} onDoi={() => setDoiTien((v) => v + 1)} />
+              <h2>Quyết toán lô</h2>
+              <QuyetToanLo loId={lo.id} version={doiTien} />
+            </>
+          )}
+        </>
       )}
 
       <h2>Nhật ký lô</h2>
