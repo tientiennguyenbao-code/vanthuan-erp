@@ -580,6 +580,8 @@ export const lotAllocations = pgTable(
     approvedAt: timestamp('approved_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancelReason: text('cancel_reason'),
+    /** Dòng sinh ra từ phiếu xuất kho (KS-5): khối lượng quy từ lô tồn về lô mua theo tỷ lệ. Trống = phân bổ thẳng từ lô mua (cách cũ). */
+    goodsIssueId: uuid('goods_issue_id').references((): AnyPgColumn => goodsIssues.id),
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),
@@ -1913,6 +1915,49 @@ export const processingInputs = pgTable(
   (t) => [primaryKey({ columns: [t.orderId, t.stockLotId] }), index('processing_inputs_lot_idx').on(t.stockLotId)],
 );
 
+/** Phiếu xuất kho (KS-5): thủ kho lấy hàng từ các lô tồn cho một lô xuất. */
+export const goodsIssues = pgTable(
+  'goods_issues',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    exportLotId: uuid('export_lot_id')
+      .notNull()
+      .references(() => exportLots.id),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    issuedOn: text('issued_on').notNull(),
+    vehicleNo: text('vehicle_no'),
+    containerNo: text('container_no'),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    note: text('note'),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('goods_issues_code_uq').on(t.code), index('goods_issues_export_idx').on(t.exportLotId), index('goods_issues_facility_idx').on(t.facilityId)],
+);
+
+export const goodsIssueLines = pgTable(
+  'goods_issue_lines',
+  {
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => goodsIssues.id),
+    stockLotId: uuid('stock_lot_id')
+      .notNull()
+      .references(() => stockLots.id),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.issueId, t.stockLotId] }), index('goods_issue_lines_lot_idx').on(t.stockLotId)],
+);
+
+export type GoodsIssue = typeof goodsIssues.$inferSelect;
 export type ProcessingOrder = typeof processingOrders.$inferSelect;
 export type FacilityZone = typeof facilityZones.$inferSelect;
 export type StockLot = typeof stockLots.$inferSelect;

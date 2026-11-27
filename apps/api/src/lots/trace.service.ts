@@ -2,7 +2,7 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nest
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { AuthContext } from '../auth/auth.types';
 import { DB, Db } from '../db/db';
-import { catchTrips, collectionSlips, commodities, fishingVessels, exportLots, facilities, facilityCodes, farmers, growingAreas, lotAllocations, lotEvents, partners, plots, purchaseLots, sprayLogs } from '../db/schema';
+import { catchTrips, collectionSlips, commodities, fishingVessels, exportLots, facilities, facilityCodes, farmers, goodsReceipts, growingAreas, lotAllocations, lotEvents, partners, plots, purchaseLots, sprayLogs } from '../db/schema';
 import { codeInEffect } from '../sourcing/area-code.rules';
 import { iuuIssues, simpIssues } from '../sourcing/catch.rules';
 import { FACILITY_SCHEMES, FacilityScheme, isSimpSpecies, ruleFor, traceChecks, TraceFacts } from '../sourcing/trace.rules';
@@ -146,6 +146,14 @@ export class TraceService {
     const facOfLot = new Map<string, Set<string>>();
     for (const a of allocs) facOfLot.set(a.purchaseLotId, new Set(a.facilityId ? [a.facilityId] : []));
     for (const e of evFac) facOfLot.get(e.purchaseLotId!)!.add(e.facilityId!);
+    // Kho, xưởng đã nhận hàng của lô mua qua phiếu nhận hàng (sơ chế, xuất kho diễn ra tại chính kho đó)
+    const rcFac = lotIds.length
+      ? await this.db
+          .selectDistinct({ purchaseLotId: goodsReceipts.purchaseLotId, facilityId: goodsReceipts.facilityId })
+          .from(goodsReceipts)
+          .where(and(inArray(goodsReceipts.purchaseLotId, lotIds), isNull(goodsReceipts.voidedAt)))
+      : [];
+    for (const e of rcFac) facOfLot.get(e.purchaseLotId)?.add(e.facilityId);
     const facIds = [...new Set([...facOfLot.values()].flatMap((s) => [...s]))];
     const facRows = facIds.length ? await this.db.select({ id: facilities.id, name: facilities.name, kind: facilities.kind }).from(facilities).where(inArray(facilities.id, facIds)).orderBy(asc(facilities.name)) : [];
     const codes = facIds.length

@@ -204,6 +204,13 @@
       "when": 1795753292788,
       "tag": "0028_so_che",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795754382346,
+      "tag": "0029_xuat_kho",
+      "breakpoints": true
     }
   ]
 }

@@ -174,7 +174,8 @@ describe('Chứng từ: checklist theo thị trường, cổng xếp tàu, đề
     // Đường dẫn gắn với người xin; người khác dùng không được
     await tp.get(link.body.duongDan).expect(403);
     await qt.post(`/api/tep/${d.tep[1].id}/lien-ket`).expect(403);
-    await nv.get(link.body.duongDan.replace(/.$/, (c: string) => (c === 'A' ? 'B' : 'A'))).expect(403);
+    // Đổi ký tự đầu của chữ ký: ký tự cuối base64url còn bit đệm nên đổi nó có khi không đổi chữ ký
+    await nv.get(link.body.duongDan.replace(/\.(.)/, (_: string, c: string) => `.${c === 'A' ? 'B' : 'A'}`)).expect(403);
     await tp.post(`/api/chung-tu/${hd.id}/duyet`).expect(204);
   });
 

@@ -12,6 +12,8 @@ export const SO_KHO: Record<string, string> = {
   so_che_ra: 'Ra từ sơ chế',
   huy_so_che: 'Huỷ do lệnh sơ chế bị từ chối',
   tra_lai_so_che: 'Trả lại do lệnh sơ chế bị từ chối',
+  xuat_kho: 'Xuất kho cho lô xuất',
+  huy_xuat_kho: 'Huỷ phiếu xuất kho, hàng về lại',
 };
 export const TRANG_THAI_LO_TON: Record<string, string> = { san_sang: 'Sẵn sàng', cho_duyet: 'Chờ Giám đốc duyệt hao hụt', huy: 'Đã huỷ' };
 export const TRANG_THAI_LENH: Record<string, string> = { xong: 'Xong', cho_duyet: 'Chờ duyệt hao hụt', tu_choi: 'Bị từ chối' };

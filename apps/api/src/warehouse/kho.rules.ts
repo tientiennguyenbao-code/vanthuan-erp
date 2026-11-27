@@ -167,3 +167,52 @@ export function blendShares(inputs: { quantityKg: number; origins: { purchaseLot
     .map(([purchaseLotId, kgv]) => ({ purchaseLotId, share: Math.round((kgv / total) * 1e9) / 1e9 }))
     .sort((a, b) => b.share - a.share);
 }
+
+// ---------- Xuất kho cho lô xuất (KS-5) ----------
+
+export interface IssueLotFacts {
+  code: string;
+  facilityId: string;
+  commodityId: string;
+  dealType: string;
+  eudrClass: string | null;
+  status: string;
+  kind: string;
+  remainingKg: number;
+  quantityKg: number;
+}
+
+/**
+ * Lô tồn có xuất được cho lô xuất này không: cùng kho của phiếu, sẵn sàng (không chờ duyệt hao hụt), không phải phụ phẩm (KS-8),
+ * cùng mặt hàng và loại giao dịch với lô xuất; cà phê đi EU phải đủ EUDR.
+ */
+export function issueRefusal(
+  lot: IssueLotFacts,
+  exp: { status: string; commodityId: string; dealType: string; market: string },
+  facilityId: string,
+  sector: string,
+): string | null {
+  if (exp.status !== 'dong_goi') return 'Chỉ xuất kho khi lô xuất đang ở bước đóng gói';
+  if (lot.facilityId !== facilityId) return `${lot.code} không ở kho này`;
+  if (lot.status !== 'san_sang') return `${lot.code} đang chờ duyệt hao hụt, chưa xuất được`;
+  if (lot.kind === 'phu_pham') return `${lot.code} là phụ phẩm, không xuất khẩu`;
+  if (lot.commodityId !== exp.commodityId) return `${lot.code} khác mặt hàng của lô xuất`;
+  if (lot.dealType !== exp.dealType) return `${lot.code} khác loại giao dịch của lô xuất (mua đứt hoặc môi giới)`;
+  if (exp.market === 'EU' && sector === 'ca_phe' && lot.eudrClass !== 'du') return `${lot.code} không đủ EUDR, không xuất cà phê đi EU được`;
+  if (!(lot.quantityKg > 0)) return `Khối lượng xuất từ ${lot.code} phải lớn hơn 0`;
+  if (lot.quantityKg > lot.remainingKg + 0.005) return `${lot.code} chỉ còn ${fmtKg(lot.remainingKg)} kg`;
+  return null;
+}
+
+/**
+ * Quy khối lượng xuất từ các lô tồn về lô mua theo tỷ lệ nguồn gốc (KS-2, KS-5).
+ * Làm tròn đến 0,01 kg; phần lệch do làm tròn dồn vào lô mua góp nhiều nhất để tổng khớp đúng.
+ */
+export function toPurchaseLots(lines: { quantityKg: number; origins: { purchaseLotId: string; share: number }[] }[]): { purchaseLotId: string; quantityKg: number }[] {
+  const total = r2(lines.reduce((s, l) => s + l.quantityKg, 0));
+  const map = new Map<string, number>();
+  for (const l of lines) for (const o of l.origins) map.set(o.purchaseLotId, (map.get(o.purchaseLotId) ?? 0) + l.quantityKg * o.share);
+  const rows = [...map.entries()].map(([purchaseLotId, kgv]) => ({ purchaseLotId, quantityKg: r2(kgv) })).sort((a, b) => b.quantityKg - a.quantityKg);
+  if (rows.length) rows[0].quantityKg = r2(rows[0].quantityKg + total - rows.reduce((s, x) => s + x.quantityKg, 0));
+  return rows.filter((x) => x.quantityKg > 0);
+}
