@@ -6,6 +6,7 @@ import { parseBody } from '../common/validation';
 import { CURRENCIES, INCOTERMS, UNITS } from '../contracts/contract.rules';
 import { BuyerPortalService } from './buyer-portal.service';
 import { CreditService } from './credit.service';
+import { ReportService } from './report.service';
 import { InquiriesService } from './inquiries.service';
 import { PriceFixingService } from './price-fixing.service';
 import { INQUIRY_SOURCES, LOST_REASONS, SAMPLE_KINDS } from './sales.rules';
@@ -282,5 +283,19 @@ export class BuyerPortalController {
   review(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
     const b = parseBody(reviewSchema, body);
     return this.portal.reviewDocument(id, { approve: b.dongY, comment: b.noiDung }, ctx);
+  }
+}
+
+const reportSchema = z.object({ tuThang: z.string().optional(), denThang: z.string().optional() });
+
+/** Báo cáo kinh doanh theo tháng (cấp quản lý bán hàng). */
+@Controller('bao-cao-kinh-doanh')
+export class SalesReportController {
+  constructor(private readonly report: ReportService) {}
+
+  @Get()
+  monthly(@Query() query: unknown, @CurrentAuth() ctx: AuthContext) {
+    const q = parseBody(reportSchema, query);
+    return this.report.monthly(ctx, { from: q.tuThang || undefined, to: q.denThang || undefined });
   }
 }
