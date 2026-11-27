@@ -43,7 +43,11 @@ export async function fullFirstLogin(app: INestApplication, user: { email: strin
   if (login.body.buoc !== 'can_cai_2_lop') throw new Error(`Bước không đúng: ${login.body.buoc}`);
   const start = await agent.post('/api/auth/cai-2-lop/bat-dau').expect(200);
   const secret: string = start.body.maBiMat;
-  const confirm = await agent.post('/api/auth/cai-2-lop/xac-nhan').send({ ma: codeFor(secret, 0) }).expect(200);
+  // Mã của bước trước nằm sát mép cửa sổ ±1 bước: nếu đồng hồ vừa sang bước 30 giây mới giữa lúc tạo mã và lúc máy chủ
+  // kiểm thì mã bị từ chối. Khi đó tạo lại mã (đã sang bước mới) và gửi lại một lần.
+  let confirm = await agent.post('/api/auth/cai-2-lop/xac-nhan').send({ ma: codeFor(secret, 0) });
+  if (confirm.status === 400) confirm = await agent.post('/api/auth/cai-2-lop/xac-nhan').send({ ma: codeFor(secret, 0) });
+  if (confirm.status !== 200) throw new Error(`Cài 2 lớp thất bại: ${confirm.status} ${JSON.stringify(confirm.body)}`);
   if (confirm.body.buoc !== 'phai_doi_mat_khau') throw new Error(`Bước không đúng: ${confirm.body.buoc}`);
   await agent.post('/api/auth/doi-mat-khau').send({ matKhauCu: user.password, matKhauMoi: NEW_PASSWORD }).expect(200);
   return { agent, secret };
