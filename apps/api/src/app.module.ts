@@ -12,9 +12,10 @@ import { SalesModule } from './sales/sales.module';
 import { SettlementModule } from './settlement/settlement.module';
 import { SourcingModule } from './sourcing/sourcing.module';
 import { UsersModule } from './users/users.module';
+import { WarehouseModule } from './warehouse/warehouse.module';
 
 @Module({
-  imports: [DbModule, AuditModule, AuthModule, UsersModule, CatalogModule, PartnersModule, ContractsModule, QuotesModule, LotsModule, SettlementModule, SourcingModule, SalesModule],
+  imports: [DbModule, AuditModule, AuthModule, UsersModule, CatalogModule, PartnersModule, ContractsModule, QuotesModule, LotsModule, SettlementModule, SourcingModule, SalesModule, WarehouseModule],
   controllers: [HealthController],
 })
 export class AppModule {}

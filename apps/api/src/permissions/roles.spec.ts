@@ -57,6 +57,16 @@ describe('Bảng phân quyền', () => {
     expect(requiresTwoFactor(['NHAN_VIEN_THU_MUA'])).toBe(true);
   });
 
+  it('kho: chỉ thủ kho ghi phiếu kho; Trưởng phòng KD và Ban Giám đốc khai khu, giao thủ kho', () => {
+    for (const r of ROLES) {
+      const p = permissionsFor([r]);
+      expect(p.includes('KHO_GHI_PHIEU')).toBe(r === 'THU_KHO');
+      expect(p.includes('KHO_CAU_HINH')).toBe(r === 'TRUONG_PHONG_KD' || r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC');
+    }
+    expect(permissionsFor(['THU_KHO'])).toEqual(['KHO_XEM', 'KHO_GHI_PHIEU']);
+    expect(requiresTwoFactor(['THU_KHO'])).toBe(true);
+  });
+
   it('đối tác không có quyền nội bộ nào', () => {
     expect(permissionsFor(['NHA_CUNG_CAP', 'NGUOI_MUA'])).toEqual([]);
   });

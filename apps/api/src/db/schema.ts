@@ -1667,3 +1667,178 @@ export const buyerDocReviews = pgTable(
   },
   (t) => [index('buyer_doc_reviews_doc_idx').on(t.lotDocumentId)],
 );
+
+// ============ Kho và sơ chế ============
+
+/**
+ * Khu trong một kho, xưởng. Nhãn của khu quyết định hàng nào được vào: khu đủ EUDR chỉ nhận cà phê đủ EUDR,
+ * kho lạnh nhận thủy sản, khu thường nhận phần còn lại.
+ */
+export const facilityZones = pgTable(
+  'facility_zones',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    /** thuong | du_eudr | kho_lanh */
+    kind: text('kind').notNull(),
+    capacityKg: numeric('capacity_kg', { precision: 14, scale: 2, mode: 'number' }),
+    active: boolean('active').notNull().default(true),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('facility_zones_code_uq').on(t.facilityId, t.code)],
+);
+
+/** Thủ kho được giao kho nào thì chỉ ghi phiếu ở kho đó. */
+export const facilityKeepers = pgTable(
+  'facility_keepers',
+  {
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    assignedBy: uuid('assigned_by')
+      .notNull()
+      .references(() => users.id),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.facilityId, t.userId] })],
+);
+
+/**
+ * Lô tồn: một khối hàng thật cùng hạng, nằm ở một khu của một kho. Biết mình đến từ những lô mua nào
+ * và mỗi lô bao nhiêu phần (bảng stock_lot_origins). Số còn lại chỉ thay đổi qua sổ kho (stock_moves).
+ */
+export const stockLots = pgTable(
+  'stock_lots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    zoneId: uuid('zone_id')
+      .notNull()
+      .references(() => facilityZones.id),
+    commodityId: uuid('commodity_id')
+      .notNull()
+      .references(() => commodities.id),
+    /** nguyen_lieu | thanh_pham | phu_pham */
+    kind: text('kind').notNull(),
+    /** Hạng sau phân loại (S18, 550 g/l, cỡ 31/40...); trống với nguyên liệu */
+    grade: text('grade'),
+    /** mua_dut | moi_gioi */
+    dealType: text('deal_type').notNull(),
+    /** Cà phê: du | khong_du; mặt hàng khác: null */
+    eudrClass: text('eudr_class'),
+    initialKg: numeric('initial_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    remainingKg: numeric('remaining_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    bags: integer('bags'),
+    /** nhan_hang | tach_lo | so_che */
+    source: text('source').notNull(),
+    /** Lô tồn bị tách ra từ lô nào (chuyển một phần sang khu khác) */
+    parentId: uuid('parent_id').references((): AnyPgColumn => stockLots.id),
+    receivedOn: text('received_on').notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('stock_lots_code_uq').on(t.code),
+    index('stock_lots_facility_idx').on(t.facilityId, t.zoneId),
+    check('stock_lots_con_lai_ck', sql`${t.remainingKg} >= 0 and ${t.remainingKg} <= ${t.initialKg}`),
+  ],
+);
+
+/** Lô tồn đến từ lô mua nào, bao nhiêu phần (tổng các phần của một lô tồn = 1). */
+export const stockLotOrigins = pgTable(
+  'stock_lot_origins',
+  {
+    stockLotId: uuid('stock_lot_id')
+      .notNull()
+      .references(() => stockLots.id),
+    purchaseLotId: uuid('purchase_lot_id')
+      .notNull()
+      .references(() => purchaseLots.id),
+    share: numeric('share', { precision: 12, scale: 9, mode: 'number' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.stockLotId, t.purchaseLotId] }), index('stock_lot_origins_purchase_idx').on(t.purchaseLotId)],
+);
+
+/**
+ * Phiếu nhận hàng: một chuyến xe về kho, cân tại kho. Sinh một lô tồn nguyên liệu.
+ * Không xoá; ghi sai thì huỷ kèm lý do khi lô tồn chưa bị dùng.
+ */
+export const goodsReceipts = pgTable(
+  'goods_receipts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    purchaseLotId: uuid('purchase_lot_id')
+      .notNull()
+      .references(() => purchaseLots.id),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    zoneId: uuid('zone_id')
+      .notNull()
+      .references(() => facilityZones.id),
+    stockLotId: uuid('stock_lot_id')
+      .notNull()
+      .references(() => stockLots.id),
+    receivedOn: text('received_on').notNull(),
+    vehicleNo: text('vehicle_no'),
+    weighTicketNo: text('weigh_ticket_no'),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    bags: integer('bags'),
+    moisturePct: numeric('moisture_pct', { precision: 5, scale: 2, mode: 'number' }),
+    note: text('note'),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidedBy: uuid('voided_by').references(() => users.id),
+    voidReason: text('void_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('goods_receipts_code_uq').on(t.code), index('goods_receipts_lot_idx').on(t.purchaseLotId), index('goods_receipts_facility_idx').on(t.facilityId)],
+);
+
+/**
+ * Sổ kho (chỉ ghi thêm): mọi lần số lượng một lô tồn thay đổi hoặc lô tồn đổi chỗ.
+ * quantityKg mang dấu: + vào, − ra; chuyển khu ghi 0 kèm khu đi, khu đến.
+ */
+export const stockMoves = pgTable(
+  'stock_moves',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    stockLotId: uuid('stock_lot_id')
+      .notNull()
+      .references(() => stockLots.id),
+    /** nhan_hang | huy_nhan_hang | chuyen_khu | tach_ra | tach_vao */
+    kind: text('kind').notNull(),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    fromZoneId: uuid('from_zone_id').references(() => facilityZones.id),
+    toZoneId: uuid('to_zone_id').references(() => facilityZones.id),
+    refId: uuid('ref_id'),
+    note: text('note'),
+    actorUserId: uuid('actor_user_id')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [index('stock_moves_lot_idx').on(t.stockLotId)],
+);
+
+export type FacilityZone = typeof facilityZones.$inferSelect;
+export type StockLot = typeof stockLots.$inferSelect;
+export type GoodsReceipt = typeof goodsReceipts.$inferSelect;
