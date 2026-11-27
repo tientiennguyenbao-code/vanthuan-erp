@@ -14,8 +14,14 @@ export const SO_KHO: Record<string, string> = {
   tra_lai_so_che: 'Trả lại do lệnh sơ chế bị từ chối',
   xuat_kho: 'Xuất kho cho lô xuất',
   huy_xuat_kho: 'Huỷ phiếu xuất kho, hàng về lại',
+  chuyen_kho_di: 'Chuyển sang kho khác',
+  chuyen_kho_den: 'Nhận từ kho khác',
+  huy_chuyen_kho: 'Huỷ phiếu chuyển kho, hàng về lại',
+  kiem_ke: 'Điều chỉnh theo kiểm kê',
 };
 export const TRANG_THAI_LO_TON: Record<string, string> = { san_sang: 'Sẵn sàng', cho_duyet: 'Chờ Giám đốc duyệt hao hụt', huy: 'Đã huỷ' };
+export const TRANG_THAI_CHUYEN: Record<string, string> = { dang_di: 'Đang đi đường', da_nhan: 'Đã nhận', huy: 'Đã huỷ' };
+export const TRANG_THAI_KIEM_KE: Record<string, string> = { dang_dem: 'Đang đếm', cho_duyet: 'Chờ Kế toán trưởng duyệt', da_dieu_chinh: 'Đã điều chỉnh sổ', tu_choi: 'Trả lại, đếm lại' };
 export const TRANG_THAI_LENH: Record<string, string> = { xong: 'Xong', cho_duyet: 'Chờ duyệt hao hụt', tu_choi: 'Bị từ chối' };
 
 export const kg = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} kg`);

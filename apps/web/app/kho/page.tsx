@@ -76,6 +76,10 @@ export default function TongQuanKho() {
         <Link href="/kho/so-che">{ghiPhieu ? 'Ghi lệnh sơ chế →' : 'Lệnh sơ chế, định mức hao hụt →'}</Link>
         {' · '}
         <Link href="/kho/xuat-kho">{ghiPhieu ? 'Xuất kho cho lô xuất →' : 'Phiếu xuất kho →'}</Link>
+        {' · '}
+        <Link href="/kho/chuyen-kho">Chuyển kho →</Link>
+        {' · '}
+        <Link href="/kho/kiem-ke">Kiểm kê tháng →</Link>
       </p>
       {loi && <div className="loi" role="alert">{loi}</div>}
       {ton && (
