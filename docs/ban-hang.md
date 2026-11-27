@@ -63,3 +63,11 @@ Xem: người xem được lô (`LO_HANG_XEM_TAT_CA`), cấp quản lý bán hà
 - Người mua không thấy: giá mua, tỷ lệ phí, chi phí, ghi chú nội bộ, giấy tờ riêng của từng nhà cung cấp. Lô mua đứt: người gửi hàng là Vạn Thuận, không hiện tên nhà cung cấp; chỉ hiện mã vùng trồng và mã cơ sở đóng gói đã duyệt (BH-7). Lô môi giới: hiện nhà cung cấp chính đứng tên trên vận đơn.
 - Chứng từ: người mua xem tệp khi chứng từ ở bản nháp, đã duyệt hoặc đã gửi. Với bản nháp và bản đã duyệt có tệp, người mua bấm đồng ý hoặc yêu cầu sửa (phải ghi nội dung) qua `POST /cong-nguoi-mua/chung-tu/:id/y-kien`. Ý kiến không đổi trạng thái chứng từ; nhân viên thấy ý kiến mới nhất ngay trong danh mục chứng từ của lô và trong nhật ký lô.
 - Khiếu nại: người mua tự mở khiếu nại cho lô của mình sau khi hàng đã xếp tàu và lô chưa quyết toán (dùng chung `POST /lo-xuat/:id/khieu-nai`).
+
+# Bước 4b: báo cáo kinh doanh theo tháng
+
+- `GET /bao-cao-kinh-doanh?tuThang=YYYY-MM&denThang=YYYY-MM` (mặc định 12 tháng gần nhất, tối đa 24 tháng). Chỉ cấp quản lý bán hàng (`HOP_DONG_XEM_TAT_CA`). Trang `/ban-hang/bao-cao`.
+- Hợp đồng bán đã ký: hợp đồng `ban` (mua đứt) và `mua_ban_truc_tiep` (môi giới), tính vào tháng ký bản gốc, giá trị theo bản đang hiệu lực, quy USD theo tỷ giá trên hợp đồng.
+- Hàng đã giao: lô đã xếp tàu hoặc hoàn tất, tính vào tháng tàu chạy; khối lượng là phần phân bổ; giá trị theo giá bán (giá trừ lùi dùng giá bình quân đã chốt).
+- Tỷ lệ thắng hỏi hàng = thắng / (thắng + thua), theo tháng nhận phiếu, bỏ phiếu huỷ. Tỷ lệ chấp nhận báo giá bán = chấp nhận / (chấp nhận + từ chối), theo tháng lập.
+- Chia theo ngành, thị trường, người mua. Thị trường của hợp đồng lấy theo nước người mua (US, EU, CN, khác); của lô đã giao lấy theo thị trường ghi trên lô. Hợp đồng hoặc lô thiếu tỷ giá được đếm riêng, không cộng vào giá trị.
