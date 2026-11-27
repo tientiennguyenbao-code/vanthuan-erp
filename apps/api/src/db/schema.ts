@@ -1645,3 +1645,25 @@ export const creditLimits = pgTable(
   (t) => [index('credit_limits_partner_idx').on(t.partnerId)],
 );
 export type CreditLimit = typeof creditLimits.$inferSelect;
+
+/**
+ * Người mua xem bản nháp chứng từ trên cổng (BH-6): đồng ý, hoặc yêu cầu sửa kèm nội dung.
+ * Mỗi lần là một dòng; dòng mới nhất là ý kiến hiện tại của người mua.
+ */
+export const buyerDocReviews = pgTable(
+  'buyer_doc_reviews',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    lotDocumentId: uuid('lot_document_id')
+      .notNull()
+      .references(() => lotDocuments.id),
+    /** dong_y | yeu_cau_sua */
+    decision: text('decision').notNull(),
+    comment: text('comment'),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('buyer_doc_reviews_doc_idx').on(t.lotDocumentId)],
+);

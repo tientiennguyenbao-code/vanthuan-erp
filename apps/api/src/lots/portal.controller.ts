@@ -8,6 +8,7 @@ import { PortalService } from './portal.service';
 const inviteSchema = z.object({
   email: z.email('Email không hợp lệ').max(200),
   hoTen: z.string().trim().min(2, 'Ghi họ tên người liên hệ').max(200),
+  vai: z.enum(['nha_cung_cap', 'nguoi_mua']).optional(),
 });
 
 /** Nhân viên quản lý tài khoản cổng của nhà cung cấp. */

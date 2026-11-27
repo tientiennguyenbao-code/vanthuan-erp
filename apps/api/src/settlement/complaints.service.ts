@@ -8,6 +8,7 @@ import { ContractsService } from '../contracts/contracts.service';
 import { DB, Db, DbExecutor } from '../db/db';
 import { complaints, ExportLot, exportLots, lotEvents, purchaseLots } from '../db/schema';
 import { LotFinanceService } from './lot-finance.service';
+import { buyerPartnerOf } from '../sales/buyer-access';
 import { faultHint } from './settlement.rules';
 
 export interface OpenInput {
@@ -90,7 +91,8 @@ export class ComplaintsService {
   async open(lotId: string, input: OpenInput, ctx: AuthContext) {
     return this.db.transaction(async (tx) => {
       const lot = await this.fin.lockLot(lotId, tx);
-      if (!this.canOpen(lot, ctx)) throw new ForbiddenException('Bạn chỉ mở được khiếu nại cho lô do mình phụ trách');
+      const buyer = await buyerPartnerOf(ctx, tx);
+      if (buyer !== null ? buyer !== lot.buyerPartnerId : !this.canOpen(lot, ctx)) throw new ForbiddenException('Bạn chỉ mở được khiếu nại cho lô do mình phụ trách');
       if (lot.status !== 'xep_tau' && lot.status !== 'hoan_tat') throw new BadRequestException('Chỉ mở khiếu nại sau khi hàng đã xếp tàu');
       await this.fin.assertUnlocked(lot, tx);
       const v = await this.fin.lotValues(lot, tx);

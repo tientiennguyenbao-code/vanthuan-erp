@@ -6,9 +6,11 @@ import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { AuthContext } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { ContractsService } from '../contracts/contracts.service';
+import { buyerPartnerOf } from '../sales/buyer-access';
 import { salesGateProblems } from '../sales/sales-gate';
 import { DB, Db, DbExecutor } from '../db/db';
 import {
+  buyerDocReviews,
   commodities,
   contracts,
   DocRule,
@@ -132,6 +134,12 @@ export class DocumentsService {
   }
 
   private async assertCanViewDoc(d: typeof lotDocuments.$inferSelect, lot: ExportLot, ctx: AuthContext, exec: DbExecutor) {
+    // Người mua (BH-6): chứng từ chung của lô mình mua; không thấy giấy tờ riêng của từng nhà cung cấp.
+    const buyer = await buyerPartnerOf(ctx, exec);
+    if (buyer !== null) {
+      if (buyer !== lot.buyerPartnerId || d.supplierPartnerId) throw new ForbiddenException('This document is not available to you');
+      return;
+    }
     const partner = await this.portalPartner(ctx, exec);
     if (partner === null) return this.assertCanViewLot(lot, ctx);
     if (!(await this.isSupplierDoc(d, partner, exec))) throw new ForbiddenException('Chứng từ này không thuộc phần việc của quý công ty');
@@ -312,6 +320,19 @@ export class DocumentsService {
           .where(inArray(documentFiles.lotDocumentId, rows.map((x) => x.d.id)))
           .orderBy(desc(documentFiles.version))
       : [];
+    // Ý kiến mới nhất của người mua về bản nháp (BH-6)
+    const reviews = rows.length
+      ? await this.db
+          .select({ r: buyerDocReviews, userName: users.fullName })
+          .from(buyerDocReviews)
+          .innerJoin(users, eq(users.id, buyerDocReviews.userId))
+          .where(inArray(buyerDocReviews.lotDocumentId, rows.map((x) => x.d.id)))
+          .orderBy(desc(buyerDocReviews.createdAt))
+      : [];
+    const reviewOf = (docId: string) => {
+      const x = reviews.find((r) => r.r.lotDocumentId === docId);
+      return x ? { quyetDinh: x.r.decision, noiDung: x.r.comment, nguoi: x.userName, luc: x.r.createdAt } : null;
+    };
     const filesOf = (docId: string) =>
       files
         .filter((x) => x.f.lotDocumentId === docId)
@@ -333,6 +354,7 @@ export class DocumentsService {
         chuaChac: x.uncertain,
         legalBasis: x.legalBasis,
         tep: filesOf(x.d.id),
+        yKienNguoiMua: reviewOf(x.d.id),
         quyen: {
           taiTep: manage && !x.d.obsolete && x.d.status !== 'da_gui' && x.d.status !== 'khong_ap_dung',
           capNhat: manage && !x.d.obsolete && x.d.status !== 'da_gui' && x.d.status !== 'khong_ap_dung',

@@ -38,6 +38,7 @@ interface ChungTu {
   chuaChac: boolean;
   quaHanRaSoat: boolean;
   legalBasis: string | null;
+  yKienNguoiMua: { quyetDinh: 'dong_y' | 'yeu_cau_sua'; noiDung: string | null; nguoi: string; luc: string } | null;
   tep: { id: string; phienBan: number; ten: string; kichThuoc: number; maBam: string; nguoiNop: string; luc: string }[];
   quyen: { taiTep: boolean; capNhat: boolean; duyet: boolean; traLai: boolean; daGui: boolean; khongApDung: boolean };
 }
@@ -152,6 +153,12 @@ export function ChecklistChungTu({ loId, onDoi }: { loId: string; onDoi: () => v
         <span className={d.status === 'da_duyet' || d.status === 'da_gui' ? 'kyc-dat' : d.status === 'khong_ap_dung' ? 'phu' : d.requirement === 'bb' ? 'kyc-canh-bao' : ''}>{TRANG_THAI_CHUNG_TU[d.status]}</span>
         {d.approvedByName && (d.status === 'da_duyet' || d.status === 'da_gui') && <div className="phu">duyệt: {d.approvedByName}</div>}
         {d.note && <div className="phu">{d.note}</div>}
+        {d.yKienNguoiMua && (
+          <div className={d.yKienNguoiMua.quyetDinh === 'dong_y' ? 'kyc-dat' : 'kyc-canh-bao'} style={{ fontWeight: 400, fontSize: 13 }}>
+            Người mua {d.yKienNguoiMua.quyetDinh === 'dong_y' ? 'đồng ý bản nháp' : 'yêu cầu sửa'}{d.yKienNguoiMua.noiDung ? `: ${d.yKienNguoiMua.noiDung}` : ''}
+            <span className="phu"> ({d.yKienNguoiMua.nguoi}, {ngayGio(d.yKienNguoiMua.luc)})</span>
+          </div>
+        )}
       </td>
       <td>
         {d.number ?? '—'}
