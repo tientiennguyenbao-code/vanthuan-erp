@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, Fragment, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Kho, kg, LOAI_LO_TON, NHAN_EUDR, TRANG_THAI_CHUYEN } from '@/lib/kho';
 import { ngay } from '@/lib/nhan';
@@ -163,7 +163,8 @@ export default function ChuyenKho() {
               const khoDen = kho.find((x) => x.id === p.toFacilityId);
               const khuHop = (khoDen?.khu ?? []).filter((z) => z.active && (p.eudrClass === 'du' ? z.kind === 'du_eudr' : z.kind !== 'du_eudr') && (p.sector !== 'thuy_san' || z.kind === 'kho_lanh'));
               return (
-                <tr key={p.id} className={p.status === 'huy' ? 'huy' : ''}>
+                <Fragment key={p.id}>
+                <tr className={p.status === 'huy' ? 'huy' : ''}>
                   <td>{p.code}<div className="phu">{p.createdByName}{p.vehicleNo ? ` · xe ${p.vehicleNo}` : ''}</div>{p.cancelReason && <div className="phu">Huỷ: {p.cancelReason}</div>}</td>
                   <td>{ngay(p.sentOn)}</td>
                   <td>{p.fromName} → {p.toName}</td>
@@ -178,8 +179,13 @@ export default function ChuyenKho() {
                   <td>
                     {p.quyen.nhan && nhan?.id !== p.id && <button className="nho" onClick={() => setNhan({ id: p.id, khuId: khuHop[0]?.id ?? '', kg: String(p.quantityKg), ngay: homNay(), bao: '' })}>Cân và nhận</button>}
                     {p.quyen.huy && huy?.id !== p.id && <button className="phu-btn nho" onClick={() => setHuy({ id: p.id, lyDo: '' })}>Huỷ</button>}
+                  </td>
+                </tr>
+                {(nhan?.id === p.id || huy?.id === p.id) && (
+                  <tr>
+                    <td colSpan={9}>
                     {nhan?.id === p.id && (
-                      <span className="hang" style={{ minWidth: 420 }}>
+                      <span className="hang" style={{ flexWrap: 'wrap' }}>
                         <select aria-label="Khu nhận" value={nhan.khuId} onChange={(e) => setNhan({ ...nhan, khuId: e.target.value })}>
                           {khuHop.map((z) => <option key={z.id} value={z.id}>Khu {z.code} · {z.name}</option>)}
                         </select>
@@ -195,8 +201,10 @@ export default function ChuyenKho() {
                         <button className="nho" onClick={() => lam(() => api(`/kho/chuyen-kho/${p.id}/huy`, { body: { lyDo: huy.lyDo } }).then(() => setHuy(null)))}>Xác nhận</button>
                       </span>
                     )}
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>

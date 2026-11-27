@@ -41,6 +41,7 @@ interface Dot {
 }
 
 const homNay = () => new Date().toISOString().slice(0, 10);
+const nguong = (v: number) => `${v.toLocaleString('vi-VN')}%`;
 const pct = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : ''}${v.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%`);
 
 export default function KiemKe() {
@@ -115,7 +116,7 @@ export default function KiemKe() {
       <p><Link href="/kho">← Kho và tồn kho</Link></p>
       <h1>Kiểm kê tháng</h1>
       <p className="phu">
-        Mở đợt thì phần mềm chụp số sổ của mọi lô tồn còn hàng. Thủ kho đếm, ghi số từng lô rồi chốt. Không lô nào lệch quá {d?.tolerancePct ?? 0.5}% thì sổ được điều chỉnh ngay; có lô lệch hơn thì Kế toán trưởng duyệt hoặc trả lại để đếm lại. Sổ điều chỉnh theo phần chênh, nên hàng ra vào trong lúc đếm vẫn giữ đúng.
+        Mở đợt thì phần mềm chụp số sổ của mọi lô tồn còn hàng. Thủ kho đếm, ghi số từng lô rồi chốt. Không lô nào lệch quá {nguong(d?.tolerancePct ?? 0.5)} thì sổ được điều chỉnh ngay; có lô lệch hơn thì Kế toán trưởng duyệt hoặc trả lại để đếm lại. Sổ điều chỉnh theo phần chênh, nên hàng ra vào trong lúc đếm vẫn giữ đúng.
       </p>
       <div className="hang">
         <div>
@@ -152,7 +153,7 @@ export default function KiemKe() {
           <div className="luoi">
             <div className="o"><div className="phu">Số trên sổ lúc mở</div><div className="so-lon">{kg(d.tong.bookKg)}</div><div className="phu">{d.dong.length} lô tồn</div></div>
             <div className="o"><div className="phu">Đã đếm</div><div className="so-lon">{d.tong.daDem}/{d.dong.length} lô</div><div className="phu">{kg(d.tong.countedKg)}</div></div>
-            <div className="o"><div className="phu">Lệch quá {d.tolerancePct}%</div><div className={`so-lon ${d.tong.vuot ? 'canh-bao-nhe' : ''}`}>{d.tong.vuot} lô</div><div className="phu">{d.tong.vuot ? 'cần Kế toán trưởng duyệt' : 'chốt là điều chỉnh ngay'}</div></div>
+            <div className="o"><div className="phu">Lệch quá {nguong(d.tolerancePct)}</div><div className={`so-lon ${d.tong.vuot ? 'canh-bao-nhe' : ''}`}>{d.tong.vuot} lô</div><div className="phu">{d.tong.vuot ? 'cần Kế toán trưởng duyệt' : 'chốt là điều chỉnh ngay'}</div></div>
           </div>
           <div className="bang-cuon">
             <table>

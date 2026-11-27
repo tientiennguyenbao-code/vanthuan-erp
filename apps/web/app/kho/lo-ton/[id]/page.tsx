@@ -104,7 +104,7 @@ export default function LoTon() {
           {buoc.length > 0 && (
             <>
               <h2>Đường đi của hàng</h2>
-              <p className="phu">Lần ngược từ lô này về phiếu nhận hàng và lô mua, qua các lệnh sơ chế và các lần tách lô.</p>
+              <p className="phu">Lần ngược từ lô này về phiếu nhận hàng và lô mua, qua các lệnh sơ chế, các lần tách lô và chuyển kho.</p>
               <ol className="chuoi">
                 {buoc.map((b, i) => (
                   <li key={`${b.ref}-${i}`} style={{ marginLeft: b.level * 20 }}>
