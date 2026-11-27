@@ -1957,6 +1957,90 @@ export const goodsIssueLines = pgTable(
   (t) => [primaryKey({ columns: [t.issueId, t.stockLotId] }), index('goods_issue_lines_lot_idx').on(t.stockLotId)],
 );
 
+/**
+ * Phiếu chuyển kho giữa hai kho, xưởng: kho đi trừ hàng khi xuất (đang đi đường), kho đến cân lại khi nhận
+ * và sinh lô tồn mới cùng nguồn gốc. Chênh lệch cân là hao hụt vận chuyển.
+ */
+export const stockTransfers = pgTable(
+  'stock_transfers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    stockLotId: uuid('stock_lot_id')
+      .notNull()
+      .references(() => stockLots.id),
+    fromFacilityId: uuid('from_facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    toFacilityId: uuid('to_facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    sentOn: text('sent_on').notNull(),
+    vehicleNo: text('vehicle_no'),
+    note: text('note'),
+    /** dang_di | da_nhan | huy */
+    status: text('status').notNull().default('dang_di'),
+    receivedKg: numeric('received_kg', { precision: 14, scale: 2, mode: 'number' }),
+    receivedOn: text('received_on'),
+    receivedZoneId: uuid('received_zone_id').references(() => facilityZones.id),
+    receivedStockLotId: uuid('received_stock_lot_id').references(() => stockLots.id),
+    receivedBy: uuid('received_by').references(() => users.id),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('stock_transfers_code_uq').on(t.code), index('stock_transfers_from_idx').on(t.fromFacilityId), index('stock_transfers_to_idx').on(t.toFacilityId)],
+);
+
+/** Đợt kiểm kê (KS-6): thủ kho đếm từng lô tồn của một kho; lô lệch quá 0,5% thì Kế toán trưởng duyệt mới điều chỉnh. */
+export const stockCounts = pgTable(
+  'stock_counts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    /** Tháng kiểm kê, dạng YYYY-MM */
+    period: text('period').notNull(),
+    countedOn: text('counted_on').notNull(),
+    /** dang_dem | cho_duyet | da_dieu_chinh | tu_choi */
+    status: text('status').notNull().default('dang_dem'),
+    note: text('note'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    decidedBy: uuid('decided_by').references(() => users.id),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decisionNote: text('decision_note'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('stock_counts_code_uq').on(t.code), index('stock_counts_facility_idx').on(t.facilityId)],
+);
+
+export const stockCountLines = pgTable(
+  'stock_count_lines',
+  {
+    countId: uuid('count_id')
+      .notNull()
+      .references(() => stockCounts.id),
+    stockLotId: uuid('stock_lot_id')
+      .notNull()
+      .references(() => stockLots.id),
+    /** Số trên sổ lúc mở đợt kiểm kê */
+    bookKg: numeric('book_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    countedKg: numeric('counted_kg', { precision: 14, scale: 2, mode: 'number' }),
+    note: text('note'),
+  },
+  (t) => [primaryKey({ columns: [t.countId, t.stockLotId] })],
+);
+
+export type StockTransfer = typeof stockTransfers.$inferSelect;
+export type StockCount = typeof stockCounts.$inferSelect;
 export type GoodsIssue = typeof goodsIssues.$inferSelect;
 export type ProcessingOrder = typeof processingOrders.$inferSelect;
 export type FacilityZone = typeof facilityZones.$inferSelect;
