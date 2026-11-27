@@ -55,3 +55,11 @@ Xem: người xem được lô (`LO_HANG_XEM_TAT_CA`), cấp quản lý bán hà
 - Tuổi nợ theo ngày đến hạn của từng khoản: chưa đến hạn, quá 1–30, 31–60, 61–90, trên 90 ngày, chưa có ngày đến hạn.
 - Trình ký và ký hợp đồng trả chậm bị chặn khi: chưa có hạn mức; số ngày trả chậm vượt số ngày được duyệt; dư nợ cộng hợp đồng này vượt hạn mức; hoặc người mua có khoản quá hạn trên 30 ngày. Hợp đồng thanh toán trước hoặc theo chứng từ không bị chặn.
 - Trang `/ban-hang/cong-no` (quyền `CONG_NO_XEM`: Ban Giám đốc, Kế toán trưởng, kế toán viên, Trưởng phòng KD) và trang chi tiết từng người mua.
+
+# Bước 4a: cổng người mua tiếng Anh (BH-5, BH-6, BH-7)
+
+- Nhân viên mời người của người mua từ trang đối tác (chọn vai "Người mua", `vai: 'nguoi_mua'`). Tài khoản mang vai `NGUOI_MUA`, không có quyền nội bộ nào, không bắt buộc đăng nhập 2 lớp, không dùng 90 ngày thì tự khoá. Trang đăng nhập và đổi mật khẩu hiện song ngữ.
+- `GET /cong-nguoi-mua`: hợp đồng đã ký (điều khoản, mã xác minh), lô hàng, khoản phải trả và tổng còn nợ. `GET /cong-nguoi-mua/lo/:id`: tiến độ lô, tàu, vận đơn, người gửi hàng, mã truy xuất, chứng từ chung của lô, mẫu, các lần chốt giá, khoản phải trả, khiếu nại.
+- Người mua không thấy: giá mua, tỷ lệ phí, chi phí, ghi chú nội bộ, giấy tờ riêng của từng nhà cung cấp. Lô mua đứt: người gửi hàng là Vạn Thuận, không hiện tên nhà cung cấp; chỉ hiện mã vùng trồng và mã cơ sở đóng gói đã duyệt (BH-7). Lô môi giới: hiện nhà cung cấp chính đứng tên trên vận đơn.
+- Chứng từ: người mua xem tệp khi chứng từ ở bản nháp, đã duyệt hoặc đã gửi. Với bản nháp và bản đã duyệt có tệp, người mua bấm đồng ý hoặc yêu cầu sửa (phải ghi nội dung) qua `POST /cong-nguoi-mua/chung-tu/:id/y-kien`. Ý kiến không đổi trạng thái chứng từ; nhân viên thấy ý kiến mới nhất ngay trong danh mục chứng từ của lô và trong nhật ký lô.
+- Khiếu nại: người mua tự mở khiếu nại cho lô của mình sau khi hàng đã xếp tàu và lô chưa quyết toán (dùng chung `POST /lo-xuat/:id/khieu-nai`).

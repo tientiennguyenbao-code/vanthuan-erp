@@ -178,10 +178,10 @@ export default function ChiTietDoiTac() {
         </form>
       )}
 
-      {suaDuoc && p.kycStatus === 'dat' && p.roles.includes('nha_cung_cap') && (
+      {suaDuoc && p.kycStatus === 'dat' && (p.roles.includes('nha_cung_cap') || p.roles.includes('nguoi_mua')) && (
         <>
-          <h2>Tài khoản cổng nhà cung cấp</h2>
-          <TaiKhoanCong doiTacId={p.id} />
+          <h2>Tài khoản cổng đối tác</h2>
+          <TaiKhoanCong doiTacId={p.id} vaiCoThe={(['nha_cung_cap', 'nguoi_mua'] as const).filter((v) => p.roles.includes(v))} />
         </>
       )}
     </KhungTrang>

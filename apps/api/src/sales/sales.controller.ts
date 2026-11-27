@@ -4,6 +4,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators';
 import { parseBody } from '../common/validation';
 import { CURRENCIES, INCOTERMS, UNITS } from '../contracts/contract.rules';
+import { BuyerPortalService } from './buyer-portal.service';
 import { CreditService } from './credit.service';
 import { InquiriesService } from './inquiries.service';
 import { PriceFixingService } from './price-fixing.service';
@@ -253,5 +254,33 @@ export class CreditController {
     const b = parseBody(decideSchema, body);
     await this.credit.decide(id, { approve: b.dongY, note: b.ghiChu }, ctx);
     return { ok: true };
+  }
+}
+
+const reviewSchema = z.object({
+  dongY: z.boolean(),
+  noiDung: optText(2000),
+});
+
+/** Cổng người mua (tiếng Anh): chỉ tài khoản vai NGUOI_MUA dùng được. */
+@Controller('cong-nguoi-mua')
+export class BuyerPortalController {
+  constructor(private readonly portal: BuyerPortalService) {}
+
+  @Get()
+  overview(@CurrentAuth() ctx: AuthContext) {
+    return this.portal.overview(ctx);
+  }
+
+  @Get('lo/:id')
+  lot(@Param('id', ParseUUIDPipe) id: string, @CurrentAuth() ctx: AuthContext) {
+    return this.portal.lotDetail(id, ctx);
+  }
+
+  @Post('chung-tu/:id/y-kien')
+  @HttpCode(200)
+  review(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown, @CurrentAuth() ctx: AuthContext) {
+    const b = parseBody(reviewSchema, body);
+    return this.portal.reviewDocument(id, { approve: b.dongY, comment: b.noiDung }, ctx);
   }
 }

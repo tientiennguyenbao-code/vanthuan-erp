@@ -8,6 +8,7 @@ import { api, Toi } from '@/lib/api';
 export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactNode }) {
   const router = useRouter();
   const coQuyen = (q: string) => toi.quyen.includes(q);
+  const laNguoiMua = toi.vaiTro.some((v) => v.ma === 'NGUOI_MUA');
   async function dangXuat() {
     await api('/auth/dang-xuat', { method: 'POST' }).catch(() => undefined);
     router.replace('/dang-nhap');
@@ -16,7 +17,8 @@ export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactN
     <>
       <header className="thanh-tren">
         <nav>
-          <Link href="/"><strong>Vạn Thuận ERP</strong></Link>
+          <Link href={laNguoiMua ? '/nguoi-mua' : '/'}><strong>{laNguoiMua ? 'Van Thuan Global' : 'Vạn Thuận ERP'}</strong></Link>
+          {laNguoiMua && <Link href="/nguoi-mua">My contracts and shipments</Link>}
           {(coQuyen('HOP_DONG_XEM_TAT_CA') || coQuyen('HOP_DONG_SOAN_CUA_MINH')) && <Link href="/ban-hang/hoi-hang">Hỏi hàng</Link>}
           {(coQuyen('HOP_DONG_XEM_TAT_CA') || coQuyen('HOP_DONG_SOAN_CUA_MINH')) && <Link href="/bao-gia">Báo giá</Link>}
           {(coQuyen('HOP_DONG_XEM_TAT_CA') || coQuyen('HOP_DONG_SOAN_CUA_MINH')) && <Link href="/ban-hang/mau">Mẫu hàng</Link>}
@@ -42,7 +44,7 @@ export function KhungTrang({ toi, children }: { toi: Toi; children: React.ReactN
         </nav>
         <div>
           <span className="phu">{toi.hoTen}</span>{' '}
-          <button className="phu-btn nho" onClick={dangXuat}>Đăng xuất</button>
+          <button className="phu-btn nho" onClick={dangXuat}>{laNguoiMua ? 'Sign out' : 'Đăng xuất'}</button>
         </div>
       </header>
       <main className="trang">{children}</main>

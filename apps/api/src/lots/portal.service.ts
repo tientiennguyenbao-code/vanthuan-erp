@@ -52,7 +52,7 @@ export class PortalService {
   async listAccounts(partnerId: string, ctx: AuthContext) {
     await this.partnerForStaff(partnerId, ctx);
     const rows = await this.db
-      .select({ id: users.id, email: users.email, hoTen: users.fullName, trangThai: users.status, daCai2Lop: users.totpEnabled, lanDangNhapCuoi: users.lastLoginAt, moiLuc: partnerUsers.invitedAt })
+      .select({ id: users.id, email: users.email, hoTen: users.fullName, trangThai: users.status, daCai2Lop: users.totpEnabled, lanDangNhapCuoi: users.lastLoginAt, moiLuc: partnerUsers.invitedAt, vai: sql<string>`(select case when bool_or(ur.role = 'NGUOI_MUA') then 'nguoi_mua' else 'nha_cung_cap' end from user_roles ur where ur.user_id = ${users.id})` })
       .from(partnerUsers)
       .innerJoin(users, eq(users.id, partnerUsers.userId))
       .where(eq(partnerUsers.partnerId, partnerId))
@@ -61,19 +61,20 @@ export class PortalService {
   }
 
   /** Tạo tài khoản cổng cho người liên hệ của nhà cung cấp đã thẩm định; trả mật khẩu tạm để gửi cho họ. */
-  async invite(partnerId: string, input: { email: string; hoTen: string }, ctx: AuthContext) {
+  async invite(partnerId: string, input: { email: string; hoTen: string; vai?: 'nha_cung_cap' | 'nguoi_mua' }, ctx: AuthContext) {
     const p = await this.partnerForStaff(partnerId, ctx);
     if (p.kycStatus !== 'dat') throw new BadRequestException('Đối tác chưa được duyệt thẩm định');
-    const [isSupplier] = await this.db.select().from(partnerRoles).where(and(eq(partnerRoles.partnerId, partnerId), eq(partnerRoles.role, 'nha_cung_cap')));
-    if (!isSupplier) throw new BadRequestException('Cổng hiện chỉ mở cho nhà cung cấp');
+    const vai = input.vai ?? 'nha_cung_cap';
+    const [hasRole] = await this.db.select().from(partnerRoles).where(and(eq(partnerRoles.partnerId, partnerId), eq(partnerRoles.role, vai)));
+    if (!hasRole) throw new BadRequestException(vai === 'nguoi_mua' ? 'Đối tác này không mang vai người mua' : 'Đối tác này không mang vai nhà cung cấp');
     const temp = generateTemporaryPassword();
     const passwordHash = await hashPassword(temp);
     try {
       const id = await this.db.transaction(async (tx) => {
         const [u] = await tx.insert(users).values({ email: input.email.trim(), fullName: input.hoTen.trim(), passwordHash, mustChangePassword: true }).returning({ id: users.id });
-        await tx.insert(userRoles).values({ userId: u.id, role: 'NHA_CUNG_CAP', grantedBy: ctx.user.id });
+        await tx.insert(userRoles).values({ userId: u.id, role: vai === 'nguoi_mua' ? 'NGUOI_MUA' : 'NHA_CUNG_CAP', grantedBy: ctx.user.id });
         await tx.insert(partnerUsers).values({ userId: u.id, partnerId, invitedBy: ctx.user.id });
-        await this.audit.record({ actorUserId: ctx.user.id, action: 'cong.moi_tai_khoan', entityType: 'partner', entityId: partnerId, detail: { email: input.email, doiTac: p.code } }, tx);
+        await this.audit.record({ actorUserId: ctx.user.id, action: 'cong.moi_tai_khoan', entityType: 'partner', entityId: partnerId, detail: { email: input.email, doiTac: p.code, vai } }, tx);
         return u.id;
       });
       return { id, matKhauTam: temp };

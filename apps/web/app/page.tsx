@@ -16,10 +16,12 @@ export default function TrangChu() {
   const toi = useToi();
   const router = useRouter();
   const laNhaCungCap = !!toi?.vaiTro.some((v) => v.ma === 'NHA_CUNG_CAP');
+  const laNguoiMua = !!toi?.vaiTro.some((v) => v.ma === 'NGUOI_MUA');
   useEffect(() => {
     if (laNhaCungCap) router.replace('/cong');
-  }, [laNhaCungCap, router]);
-  if (!toi || laNhaCungCap) return null;
+    else if (laNguoiMua) router.replace('/nguoi-mua');
+  }, [laNhaCungCap, laNguoiMua, router]);
+  if (!toi || laNhaCungCap || laNguoiMua) return null;
   const duocXem = PHAN_HE.filter((p) => p.quyen.some((q) => toi.quyen.includes(q)));
   return (
     <KhungTrang toi={toi}>

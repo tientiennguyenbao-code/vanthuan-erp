@@ -52,6 +52,7 @@ export const SU_KIEN_LO: Record<string, string> = {
   thanh_toan: 'Ghi nhận thu chi',
   tai_tro: 'Tài trợ ngân hàng',
   khieu_nai_mo: 'Mở khiếu nại',
+  nguoi_mua_y_kien: 'Người mua cho ý kiến chứng từ',
   khieu_nai_dong: 'Đóng khiếu nại',
   quyet_toan_lap: 'Lập quyết toán',
   quyet_toan_duyet: 'Duyệt quyết toán',
