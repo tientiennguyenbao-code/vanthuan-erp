@@ -41,6 +41,8 @@ export interface ContractTerms {
   duyetMauTruocXuat?: boolean | null;
   /** Giá trừ lùi cho cà phê (BH-2): giá = giá sàn kỳ hạn + chênh lệch; đơn giá trên hợp đồng là giá tạm tính. */
   giaTruLui?: DifferentialPricing | null;
+  /** Bán trả chậm: người mua trả sau số ngày này kể từ ngày tàu chạy (BH-3, cần hạn mức nợ) */
+  traChamNgay?: number | null;
 }
 
 export interface DeliveryInstalment {

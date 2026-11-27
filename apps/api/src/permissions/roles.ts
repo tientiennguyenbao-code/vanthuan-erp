@@ -87,6 +87,13 @@ export const PERMISSIONS = [
   'QUYET_TOAN_DUYET',
   /** Giám đốc duyệt thêm khi lô lỗ hoặc biên thấp hơn dự toán quá 10% */
   'QUYET_TOAN_DUYET_GD',
+  // Công nợ người mua (BH-3)
+  /** Xem công nợ, tuổi nợ và hạn mức của người mua */
+  'CONG_NO_XEM',
+  /** Đề xuất hạn mức nợ cho người mua. Kế toán trưởng. */
+  'HAN_MUC_DE_XUAT',
+  /** Duyệt hạn mức nợ. Chỉ Giám đốc. */
+  'HAN_MUC_DUYET',
   // Đối tác
   'DOI_TAC_XEM',
   /** Tạo, sửa đối tác do mình phụ trách */
@@ -136,10 +143,11 @@ const BAN_GIAM_DOC: Permission[] = [
   'NANG_SUAT_DAT',
   'NGUON_CUNG_DUYET_RUNG',
   'NGUON_CUNG_DUYET_MA',
+  'CONG_NO_XEM',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  GIAM_DOC: [...BAN_GIAM_DOC, 'NGUON_CUNG_XEM_CCCD', 'HOP_DONG_UY_QUYEN', 'LO_HANG_MO_CHAN', 'THANH_TOAN_DUYET_VUOT', 'QUYET_TOAN_DUYET_GD'],
+  GIAM_DOC: [...BAN_GIAM_DOC, 'NGUON_CUNG_XEM_CCCD', 'HOP_DONG_UY_QUYEN', 'LO_HANG_MO_CHAN', 'THANH_TOAN_DUYET_VUOT', 'QUYET_TOAN_DUYET_GD', 'HAN_MUC_DUYET'],
   // Phó Giám đốc ký hợp đồng theo ủy quyền của Giám đốc: phân hệ hợp đồng kiểm tra văn bản
   // ủy quyền còn hiệu lực và hạn mức trước mỗi lần ký.
   PHO_GIAM_DOC: BAN_GIAM_DOC,
@@ -157,6 +165,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'QUYET_TOAN_DUYET',
     'DOI_TAC_XEM',
     'NGUON_CUNG_XEM',
+    'CONG_NO_XEM',
+    'HAN_MUC_DE_XUAT',
   ],
   TRUONG_PHONG_KD: [
     'HOP_DONG_XEM_TAT_CA',
@@ -174,6 +184,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'DANH_MUC_QUAN_LY',
     'KHIEU_NAI_MO',
     'KHIEU_NAI_GIAI_QUYET',
+    'CONG_NO_XEM',
     'NGUON_CUNG_XEM',
     'NGUON_CUNG_QUAN_LY',
     'NGUON_CUNG_DUYET_RUNG',
@@ -202,6 +213,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'THANH_TOAN_GHI_NHAN',
     'QUYET_TOAN_LAP',
     'DOI_TAC_XEM',
+    'CONG_NO_XEM',
   ],
   // Quản trị hệ thống chỉ quản lý tài khoản, không xem nội dung nghiệp vụ.
   QUAN_TRI_HE_THONG: ['TAI_KHOAN_QUAN_LY'],

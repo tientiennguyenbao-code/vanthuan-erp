@@ -1615,3 +1615,33 @@ export const priceFixations = pgTable(
   (t) => [index('price_fixations_lot_idx').on(t.exportLotId)],
 );
 export type PriceFixation = typeof priceFixations.$inferSelect;
+
+/**
+ * Hạn mức nợ của người mua (BH-3): Kế toán trưởng đề xuất, Giám đốc duyệt. Chưa có hạn mức được duyệt thì
+ * hạn mức là 0, tức là không bán trả chậm. Mỗi lần đổi là một dòng mới; dòng được duyệt mới nhất có hiệu lực.
+ */
+export const creditLimits = pgTable(
+  'credit_limits',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    partnerId: uuid('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    /** Hạn mức dư nợ tối đa, USD */
+    amountUsd: numeric('amount_usd', { precision: 18, scale: 2, mode: 'number' }).notNull(),
+    /** Số ngày trả chậm tối đa sau ngày đến hạn chứng từ */
+    maxDays: integer('max_days').notNull(),
+    /** de_xuat | da_duyet | tu_choi | huy */
+    status: text('status').notNull().default('de_xuat'),
+    reason: text('reason').notNull(),
+    proposedBy: uuid('proposed_by')
+      .notNull()
+      .references(() => users.id),
+    proposedAt: timestamp('proposed_at', { withTimezone: true }).notNull().defaultNow(),
+    decidedBy: uuid('decided_by').references(() => users.id),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decisionNote: text('decision_note'),
+  },
+  (t) => [index('credit_limits_partner_idx').on(t.partnerId)],
+);
+export type CreditLimit = typeof creditLimits.$inferSelect;

@@ -176,6 +176,13 @@
       "when": 1795699235897,
       "tag": "0024_hop_dong_nhieu_dot_chot_gia",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795703993797,
+      "tag": "0025_han_muc_no",
+      "breakpoints": true
     }
   ]
 }
