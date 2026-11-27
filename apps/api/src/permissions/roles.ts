@@ -10,6 +10,7 @@ export const ROLES = [
   'TRUONG_PHONG_KD',
   'NHAN_VIEN_KD',
   'NHAN_VIEN_THU_MUA',
+  'THU_KHO',
   'KE_TOAN_VIEN',
   'QUAN_TRI_HE_THONG',
   // Vai trò của đối tác trên cổng (dùng từ phân hệ cổng đối tác)
@@ -26,6 +27,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   TRUONG_PHONG_KD: 'Trưởng phòng kinh doanh',
   NHAN_VIEN_KD: 'Nhân viên kinh doanh',
   NHAN_VIEN_THU_MUA: 'Nhân viên thu mua',
+  THU_KHO: 'Thủ kho',
   KE_TOAN_VIEN: 'Kế toán viên',
   QUAN_TRI_HE_THONG: 'Quản trị hệ thống',
   NHA_CUNG_CAP: 'Nhà cung cấp',
@@ -40,6 +42,7 @@ export const STAFF_ROLES: readonly Role[] = [
   'TRUONG_PHONG_KD',
   'NHAN_VIEN_KD',
   'NHAN_VIEN_THU_MUA',
+  'THU_KHO',
   'KE_TOAN_VIEN',
   'QUAN_TRI_HE_THONG',
 ];
@@ -117,6 +120,13 @@ export const PERMISSIONS = [
   'NGUON_CUNG_DUYET_MA',
   /** Đặt năng suất tối đa (kg/ha/năm) theo ngành và theo vùng: trần sản lượng của thửa */
   'NANG_SUAT_DAT',
+  // Kho và sơ chế
+  /** Xem kho, khu, lô tồn, sổ kho */
+  'KHO_XEM',
+  /** Khai khu trong kho, giao thủ kho cho kho */
+  'KHO_CAU_HINH',
+  /** Ghi phiếu nhận hàng, chuyển khu ở kho mình được giao */
+  'KHO_GHI_PHIEU',
   // Danh mục
   'DANH_MUC_QUAN_LY',
   // Quản trị
@@ -144,6 +154,8 @@ const BAN_GIAM_DOC: Permission[] = [
   'NGUON_CUNG_DUYET_RUNG',
   'NGUON_CUNG_DUYET_MA',
   'CONG_NO_XEM',
+  'KHO_XEM',
+  'KHO_CAU_HINH',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
@@ -167,6 +179,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'NGUON_CUNG_XEM',
     'CONG_NO_XEM',
     'HAN_MUC_DE_XUAT',
+    'KHO_XEM',
   ],
   TRUONG_PHONG_KD: [
     'HOP_DONG_XEM_TAT_CA',
@@ -189,6 +202,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'NGUON_CUNG_QUAN_LY',
     'NGUON_CUNG_DUYET_RUNG',
     'NGUON_CUNG_DUYET_MA',
+    'KHO_XEM',
+    'KHO_CAU_HINH',
   ],
   NHAN_VIEN_KD: [
     'HOP_DONG_SOAN_CUA_MINH',
@@ -200,9 +215,12 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'DOI_TAC_MOI_CONG',
     'KHIEU_NAI_MO',
     'NGUON_CUNG_XEM',
+    'KHO_XEM',
   ],
   // Thu mua: lập hồ sơ nông hộ, vùng trồng, thửa của mọi nhà cung cấp; xem đối tác để biết nhà cung cấp nào đã thẩm định.
-  NHAN_VIEN_THU_MUA: ['DOI_TAC_XEM', 'NGUON_CUNG_XEM', 'NGUON_CUNG_QUAN_LY', 'NGUON_CUNG_XEM_CCCD'],
+  NHAN_VIEN_THU_MUA: ['DOI_TAC_XEM', 'NGUON_CUNG_XEM', 'NGUON_CUNG_QUAN_LY', 'NGUON_CUNG_XEM_CCCD', 'KHO_XEM'],
+  // Thủ kho: ghi phiếu ở kho được giao (phân hệ kho kiểm việc giao kho), xem tồn kho và lô mua để nhận hàng.
+  THU_KHO: ['KHO_XEM', 'KHO_GHI_PHIEU'],
   KE_TOAN_VIEN: [
     'HOP_DONG_XEM_TAT_CA',
     'LO_HANG_XEM_TAT_CA',
@@ -214,6 +232,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'QUYET_TOAN_LAP',
     'DOI_TAC_XEM',
     'CONG_NO_XEM',
+    'KHO_XEM',
   ],
   // Quản trị hệ thống chỉ quản lý tài khoản, không xem nội dung nghiệp vụ.
   QUAN_TRI_HE_THONG: ['TAI_KHOAN_QUAN_LY'],
