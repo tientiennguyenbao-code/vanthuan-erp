@@ -1746,6 +1746,10 @@ export const stockLots = pgTable(
     source: text('source').notNull(),
     /** Lô tồn bị tách ra từ lô nào (chuyển một phần sang khu khác) */
     parentId: uuid('parent_id').references((): AnyPgColumn => stockLots.id),
+    /** Lệnh sơ chế sinh ra lô tồn này */
+    processingOrderId: uuid('processing_order_id').references((): AnyPgColumn => processingOrders.id),
+    /** san_sang | cho_duyet (đầu ra của lệnh vượt định mức, chưa dùng được) | huy */
+    status: text('status').notNull().default('san_sang'),
     receivedOn: text('received_on').notNull(),
     createdBy: uuid('created_by')
       .notNull()
@@ -1839,6 +1843,77 @@ export const stockMoves = pgTable(
   (t) => [index('stock_moves_lot_idx').on(t.stockLotId)],
 );
 
+/** Định mức hao hụt theo ngành và công đoạn (phần trăm khối lượng đầu vào), do Ban Giám đốc đặt (KS-3). */
+export const processingNorms = pgTable(
+  'processing_norms',
+  {
+    sector: text('sector').notNull(),
+    step: text('step').notNull(),
+    maxLossPct: numeric('max_loss_pct', { precision: 6, scale: 2, mode: 'number' }).notNull(),
+    setBy: uuid('set_by')
+      .notNull()
+      .references(() => users.id),
+    setAt: timestamp('set_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.sector, t.step] })],
+);
+
+/**
+ * Lệnh sơ chế: một công đoạn ở một kho, xưởng. Lấy một hoặc nhiều lô tồn vào, ra nhiều lô tồn theo hạng và phụ phẩm.
+ * Vào = ra + hao hụt. Hao hụt vượt định mức thì chờ Giám đốc hoặc Phó Giám đốc duyệt; đầu ra chưa dùng được.
+ */
+export const processingOrders = pgTable(
+  'processing_orders',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull(),
+    facilityId: uuid('facility_id')
+      .notNull()
+      .references(() => facilities.id),
+    commodityId: uuid('commodity_id')
+      .notNull()
+      .references(() => commodities.id),
+    step: text('step').notNull(),
+    processedOn: text('processed_on').notNull(),
+    inputKg: numeric('input_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    outputKg: numeric('output_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    byproductKg: numeric('byproduct_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    /** Âm khi công đoạn làm tăng khối lượng (mạ băng) */
+    lossKg: numeric('loss_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    lossPct: numeric('loss_pct', { precision: 7, scale: 2, mode: 'number' }).notNull(),
+    /** Định mức lúc ghi lệnh; null khi chưa có định mức */
+    normPct: numeric('norm_pct', { precision: 6, scale: 2, mode: 'number' }),
+    /** xong | cho_duyet | tu_choi */
+    status: text('status').notNull(),
+    overReason: text('over_reason'),
+    note: text('note'),
+    decidedBy: uuid('decided_by').references(() => users.id),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decisionNote: text('decision_note'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('processing_orders_code_uq').on(t.code), index('processing_orders_facility_idx').on(t.facilityId, t.status)],
+);
+
+/** Lô tồn đưa vào lệnh sơ chế, bao nhiêu kg. */
+export const processingInputs = pgTable(
+  'processing_inputs',
+  {
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => processingOrders.id),
+    stockLotId: uuid('stock_lot_id')
+      .notNull()
+      .references(() => stockLots.id),
+    quantityKg: numeric('quantity_kg', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.orderId, t.stockLotId] }), index('processing_inputs_lot_idx').on(t.stockLotId)],
+);
+
+export type ProcessingOrder = typeof processingOrders.$inferSelect;
 export type FacilityZone = typeof facilityZones.$inferSelect;
 export type StockLot = typeof stockLots.$inferSelect;
 export type GoodsReceipt = typeof goodsReceipts.$inferSelect;

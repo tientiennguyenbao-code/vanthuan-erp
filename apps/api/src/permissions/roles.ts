@@ -127,6 +127,10 @@ export const PERMISSIONS = [
   'KHO_CAU_HINH',
   /** Ghi phiếu nhận hàng, chuyển khu ở kho mình được giao */
   'KHO_GHI_PHIEU',
+  /** Đặt định mức hao hụt theo ngành và công đoạn sơ chế */
+  'SO_CHE_DINH_MUC',
+  /** Duyệt lệnh sơ chế có hao hụt vượt định mức (KS-3) */
+  'SO_CHE_DUYET',
   // Danh mục
   'DANH_MUC_QUAN_LY',
   // Quản trị
@@ -156,6 +160,8 @@ const BAN_GIAM_DOC: Permission[] = [
   'CONG_NO_XEM',
   'KHO_XEM',
   'KHO_CAU_HINH',
+  'SO_CHE_DINH_MUC',
+  'SO_CHE_DUYET',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {

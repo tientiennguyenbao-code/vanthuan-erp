@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { kg, Khu, LOAI_LO_TON, NguonGoc, NHAN_EUDR, phanTram, SO_KHO } from '@/lib/kho';
+import { kg, Khu, LOAI_LO_TON, NguonGoc, NHAN_EUDR, phanTram, SO_KHO, TRANG_THAI_LO_TON } from '@/lib/kho';
 import { LOAI_GIAO_DICH } from '@/lib/lo-hang';
 import { ngay, ngayGio } from '@/lib/nhan';
 import { useToi } from '@/lib/use-toi';
@@ -26,12 +26,14 @@ interface ChiTiet {
   bags: number | null;
   source: string;
   parentId: string | null;
+  status: string;
   receivedOn: string;
   nguonGoc: NguonGoc[];
   soKho: { id: number; at: string; kind: string; quantityKg: number; fromZoneCode: string | null; toZoneCode: string | null; note: string | null; actorName: string }[];
   khuKhac: Khu[];
   quyen: { chuyenKhu: boolean };
 }
+interface Buoc { level: number; kind: string; ref: string; label: string; detail: string; lots: string[] }
 
 export default function LoTon() {
   const toi = useToi();
@@ -39,8 +41,13 @@ export default function LoTon() {
   const [d, setD] = useState<ChiTiet | null>(null);
   const [loi, setLoi] = useState('');
   const [f, setF] = useState({ khuId: '', khoiLuongKg: '' });
+  const [buoc, setBuoc] = useState<Buoc[]>([]);
 
-  const tai = useCallback(async () => setD(await api<ChiTiet>(`/kho/lo-ton/${id}`)), [id]);
+  const tai = useCallback(async () => {
+    const [a, b] = await Promise.all([api<ChiTiet>(`/kho/lo-ton/${id}`), api<{ buoc: Buoc[] }>(`/kho/lo-ton/${id}/truy-xuat`)]);
+    setD(a);
+    setBuoc(b.buoc);
+  }, [id]);
   useEffect(() => {
     if (toi) tai().catch((e: Error) => setLoi(e.message));
   }, [toi, tai]);
@@ -70,6 +77,11 @@ export default function LoTon() {
             {d.commodityName} · {LOAI_LO_TON[d.kind]}{d.grade ? ` · hạng ${d.grade}` : ''} · {LOAI_GIAO_DICH[d.dealType]}{' '}
             {d.eudrClass && <span className={`nhan ${d.eudrClass === 'du' ? 'nhan-eudr' : 'nhan-khong-eudr'}`}>{NHAN_EUDR[d.eudrClass]}</span>}
           </p>
+          {d.status !== 'san_sang' && (
+            <p className={d.status === 'cho_duyet' ? 'canh-bao-nhe' : 'phu'}>
+              {TRANG_THAI_LO_TON[d.status]}.{d.status === 'cho_duyet' && ' Lô này chưa chuyển khu, chưa sơ chế tiếp, chưa xuất được cho tới khi Giám đốc duyệt.'}
+            </p>
+          )}
           <div className="luoi">
             <div className="o"><div className="phu">Đang ở</div><div className="so-lon">{d.zoneCode}</div><div className="phu">{d.zoneName}, {d.facilityName}</div></div>
             <div className="o"><div className="phu">Còn lại</div><div className="so-lon">{kg(d.remainingKg)}</div><div className="phu">ban đầu {kg(d.initialKg)}{d.bags ? ` · ${d.bags} bao` : ''}</div></div>
@@ -88,6 +100,22 @@ export default function LoTon() {
               </tbody>
             </table>
           </div>
+
+          {buoc.length > 0 && (
+            <>
+              <h2>Đường đi của hàng</h2>
+              <p className="phu">Lần ngược từ lô này về phiếu nhận hàng và lô mua, qua các lệnh sơ chế và các lần tách lô.</p>
+              <ol className="chuoi">
+                {buoc.map((b, i) => (
+                  <li key={`${b.ref}-${i}`} style={{ marginLeft: b.level * 20 }}>
+                    <strong>{b.label}</strong> <span className="phu">{b.ref}</span>
+                    <div>{b.detail}</div>
+                    <div className="phu">{b.kind === 'nhan_hang' ? 'Lô mua: ' : 'Từ: '}{b.lots.join(', ')}</div>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
 
           {d.quyen.chuyenKhu && (
             <form className="o" style={{ marginTop: 16 }} onSubmit={chuyen}>

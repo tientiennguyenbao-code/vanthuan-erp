@@ -57,11 +57,13 @@ describe('Bảng phân quyền', () => {
     expect(requiresTwoFactor(['NHAN_VIEN_THU_MUA'])).toBe(true);
   });
 
-  it('kho: chỉ thủ kho ghi phiếu kho; Trưởng phòng KD và Ban Giám đốc khai khu, giao thủ kho', () => {
+  it('kho: chỉ thủ kho ghi phiếu kho; Trưởng phòng KD và Ban Giám đốc khai khu; chỉ Ban Giám đốc đặt định mức và duyệt hao hụt vượt', () => {
     for (const r of ROLES) {
       const p = permissionsFor([r]);
       expect(p.includes('KHO_GHI_PHIEU')).toBe(r === 'THU_KHO');
       expect(p.includes('KHO_CAU_HINH')).toBe(r === 'TRUONG_PHONG_KD' || r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC');
+      expect(p.includes('SO_CHE_DUYET')).toBe(r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC');
+      expect(p.includes('SO_CHE_DINH_MUC')).toBe(r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC');
     }
     expect(permissionsFor(['THU_KHO'])).toEqual(['KHO_XEM', 'KHO_GHI_PHIEU']);
     expect(requiresTwoFactor(['THU_KHO'])).toBe(true);
