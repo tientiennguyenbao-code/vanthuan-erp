@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Kho, kg, LOAI_KHU, LOAI_LO_TON, NHAN_EUDR } from '@/lib/kho';
+import { Kho, kg, LOAI_KHU, LOAI_LO_TON, NHAN_EUDR, TRANG_THAI_LO_TON } from '@/lib/kho';
 import { HINH_THUC_CO_SO, LOAI_CO_SO, NGANH } from '@/lib/nhan';
 import { useToi } from '@/lib/use-toi';
 import { KhungTrang } from '../khung-trang';
@@ -21,6 +21,7 @@ interface DongTon {
   grade: string | null;
   dealType: string;
   eudrClass: string | null;
+  status: string;
   kg: number;
   bags: number | null;
   lots: number;
@@ -69,7 +70,11 @@ export default function TongQuanKho() {
       <p className="phu">
         Mỗi lô tồn là một khối hàng thật cùng hạng, nằm ở một khu của một kho, và nhớ nó đến từ những lô mua nào. Cà phê đủ EUDR chỉ nằm ở khu đủ EUDR; thủy sản chỉ nằm ở kho lạnh.
       </p>
-      <p><Link href="/kho/nhan-hang">{ghiPhieu ? 'Ghi phiếu nhận hàng, xem lô tồn →' : 'Xem lô tồn và phiếu nhận hàng →'}</Link></p>
+      <p>
+        <Link href="/kho/nhan-hang">{ghiPhieu ? 'Ghi phiếu nhận hàng, xem lô tồn →' : 'Xem lô tồn và phiếu nhận hàng →'}</Link>
+        {' · '}
+        <Link href="/kho/so-che">{ghiPhieu ? 'Ghi lệnh sơ chế →' : 'Lệnh sơ chế, định mức hao hụt →'}</Link>
+      </p>
       {loi && <div className="loi" role="alert">{loi}</div>}
       {ton && (
         <div className="luoi" style={{ marginTop: 12 }}>
@@ -119,10 +124,10 @@ export default function TongQuanKho() {
               <tbody>
                 {dong.length === 0 && <tr><td colSpan={9} className="phu">Kho này chưa có hàng.</td></tr>}
                 {dong.map((r) => (
-                  <tr key={`${r.zoneId}-${r.commodityName}-${r.kind}-${r.grade}-${r.dealType}-${r.eudrClass}`}>
+                  <tr key={`${r.zoneId}-${r.commodityName}-${r.kind}-${r.grade}-${r.dealType}-${r.eudrClass}-${r.status}`}>
                     <td><strong>{r.zoneCode}</strong> <span className="phu">{LOAI_KHU[r.zoneKind]}</span></td>
                     <td>{r.commodityName} <span className="phu">{NGANH[r.sector]}</span></td>
-                    <td>{LOAI_LO_TON[r.kind] ?? r.kind}</td>
+                    <td>{LOAI_LO_TON[r.kind] ?? r.kind}{r.status !== 'san_sang' && <div className="canh-bao-nhe">{TRANG_THAI_LO_TON[r.status]}</div>}</td>
                     <td>{r.grade ?? '—'}</td>
                     <td>{r.eudrClass ? <span className={`nhan ${r.eudrClass === 'du' ? 'nhan-eudr' : 'nhan-khong-eudr'}`}>{NHAN_EUDR[r.eudrClass]}</span> : '—'}</td>
                     <td className="so">{kg(r.kg)}</td>

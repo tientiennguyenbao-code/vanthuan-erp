@@ -197,6 +197,13 @@
       "when": 1795751988968,
       "tag": "0027_kho_nhan_hang",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795753292788,
+      "tag": "0028_so_che",
+      "breakpoints": true
     }
   ]
 }

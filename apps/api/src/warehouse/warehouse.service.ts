@@ -223,6 +223,7 @@ export class WarehouseService {
         grade: stockLots.grade,
         dealType: stockLots.dealType,
         eudrClass: stockLots.eudrClass,
+        status: stockLots.status,
         kg: sql<number>`sum(${stockLots.remainingKg})::float8`,
         bags: sql<number | null>`sum(${stockLots.bags})::int`,
         lots: sql<number>`count(*)::int`,
@@ -246,6 +247,7 @@ export class WarehouseService {
         stockLots.grade,
         stockLots.dealType,
         stockLots.eudrClass,
+        stockLots.status,
       )
       .orderBy(asc(facilities.name), asc(facilityZones.code), asc(commodities.name), asc(stockLots.grade));
     return {
@@ -264,7 +266,7 @@ export class WarehouseService {
       conds.push(inArray(stockLots.id, this.db.select({ id: stockLotOrigins.stockLotId }).from(stockLotOrigins).where(eq(stockLotOrigins.purchaseLotId, filter.purchaseLotId))));
     }
     const rows = await this.db
-      .select({ s: stockLots, facilityName: facilities.name, zoneCode: facilityZones.code, zoneName: facilityZones.name, commodityName: commodities.name })
+      .select({ s: stockLots, facilityName: facilities.name, zoneCode: facilityZones.code, zoneName: facilityZones.name, commodityName: commodities.name, sector: commodities.sector })
       .from(stockLots)
       .innerJoin(facilities, eq(facilities.id, stockLots.facilityId))
       .innerJoin(facilityZones, eq(facilityZones.id, stockLots.zoneId))
@@ -280,8 +282,9 @@ export class WarehouseService {
       zoneCode: r.zoneCode,
       zoneName: r.zoneName,
       commodityName: r.commodityName,
+      sector: r.sector,
       nguonGoc: origins.get(r.s.id) ?? [],
-      quyen: { chuyenKhu: mine.has(r.s.facilityId) && r.s.remainingKg > 0 },
+      quyen: { chuyenKhu: mine.has(r.s.facilityId) && r.s.remainingKg > 0 && r.s.status === 'san_sang' },
     }));
   }
 
@@ -331,7 +334,7 @@ export class WarehouseService {
 
   private async listStockLotsById(id: string, ctx: AuthContext) {
     const rows = await this.db
-      .select({ s: stockLots, facilityName: facilities.name, zoneCode: facilityZones.code, zoneName: facilityZones.name, commodityName: commodities.name })
+      .select({ s: stockLots, facilityName: facilities.name, zoneCode: facilityZones.code, zoneName: facilityZones.name, commodityName: commodities.name, sector: commodities.sector })
       .from(stockLots)
       .innerJoin(facilities, eq(facilities.id, stockLots.facilityId))
       .innerJoin(facilityZones, eq(facilityZones.id, stockLots.zoneId))
@@ -345,8 +348,9 @@ export class WarehouseService {
       zoneCode: r.zoneCode,
       zoneName: r.zoneName,
       commodityName: r.commodityName,
+      sector: r.sector,
       nguonGoc: origins.get(r.s.id) ?? [],
-      quyen: { chuyenKhu: mine.has(r.s.facilityId) && r.s.remainingKg > 0 },
+      quyen: { chuyenKhu: mine.has(r.s.facilityId) && r.s.remainingKg > 0 && r.s.status === 'san_sang' },
     }));
   }
 
@@ -505,6 +509,7 @@ export class WarehouseService {
     return this.db.transaction(async (tx) => {
       const s = await this.lockStockLot(id, tx);
       await this.assertKeeper(s.facilityId, ctx, tx);
+      if (s.status === 'cho_duyet') throw new BadRequestException('Lô tồn đang chờ Giám đốc duyệt hao hụt, chưa chuyển được');
       const qty = input.quantityKg ?? s.remainingKg;
       const bad = moveRefusal(s.remainingKg, qty);
       if (bad) throw new BadRequestException(bad);

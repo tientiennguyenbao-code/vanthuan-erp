@@ -8,7 +8,13 @@ export const SO_KHO: Record<string, string> = {
   chuyen_khu: 'Chuyển khu',
   tach_ra: 'Tách sang lô mới',
   tach_vao: 'Tách từ lô',
+  so_che_vao: 'Đưa vào sơ chế',
+  so_che_ra: 'Ra từ sơ chế',
+  huy_so_che: 'Huỷ do lệnh sơ chế bị từ chối',
+  tra_lai_so_che: 'Trả lại do lệnh sơ chế bị từ chối',
 };
+export const TRANG_THAI_LO_TON: Record<string, string> = { san_sang: 'Sẵn sàng', cho_duyet: 'Chờ Giám đốc duyệt hao hụt', huy: 'Đã huỷ' };
+export const TRANG_THAI_LENH: Record<string, string> = { xong: 'Xong', cho_duyet: 'Chờ duyệt hao hụt', tu_choi: 'Bị từ chối' };
 
 export const kg = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} kg`);
 export const phanTram = (v: number) => `${(v * 100).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`;

@@ -65,6 +65,7 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--
 .kyc-canh-bao { color: var(--loi); font-weight: 600; }
 textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--vien); border-radius: 8px; background: var(--the); color: var(--chu); font: inherit; min-height: 70px; }
 .huy { opacity: 0.55; text-decoration: line-through; }
+.mo { opacity: 0.45; }
 .bang-gon { min-width: 0; }
 .bang-gon td, .bang-gon th { padding: 4px 0; }
 .o-tien { min-width: 90px; }
@@ -111,3 +112,5 @@ details.o summary { cursor: pointer; font-weight: 600; }
 
 td.so, th.so { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 tr.thieu td { background: color-mix(in srgb, var(--vang) 10%, transparent); }
+.chuoi { list-style: none; padding-left: 0; }
+.chuoi li { border-left: 3px solid var(--chinh); padding: 4px 0 8px 12px; margin-bottom: 6px; }
