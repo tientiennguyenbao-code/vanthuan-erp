@@ -27,6 +27,7 @@ interface PhanBo {
   approvedAt: string | null;
   cancelledAt: string | null;
   cancelReason: string | null;
+  phieuXuatKho: string | null;
   biChia: boolean;
   nccDongY: boolean;
   coTheDuyet: boolean;
@@ -235,7 +236,7 @@ export default function ChiTietLoXuat() {
             {lo.phanBo.length === 0 && <tr><td colSpan={6} className="phu">Chưa phân bổ.</td></tr>}
             {lo.phanBo.map((p) => (
               <tr key={p.id} className={p.cancelledAt ? 'huy' : ''}>
-                <td><Link href={`/lo-hang/lo-mua/${p.purchaseLotId}`}>{p.lotCode}</Link><div className="phu">tạo bởi {p.createdByName}</div></td>
+                <td><Link href={`/lo-hang/lo-mua/${p.purchaseLotId}`}>{p.lotCode}</Link><div className="phu">{p.phieuXuatKho ? `từ phiếu xuất kho ${p.phieuXuatKho}, ` : ''}tạo bởi {p.createdByName}</div></td>
                 <td>{p.supplierName}<div className="phu">{p.growingAreaCode ? `Vùng trồng ${p.growingAreaCode}` : 'Chưa có mã vùng trồng'}</div></td>
                 <td>{kg(p.quantityKg)}</td>
                 <td>{p.cancelledAt ? `Huỷ: ${p.cancelReason}` : p.approvedAt ? <span className="kyc-dat">{p.approvedByName}</span> : <span className="phu">Chờ Trưởng phòng</span>}</td>
@@ -243,7 +244,7 @@ export default function ChiTietLoXuat() {
                 <td>
                   <div className="hang" style={{ gap: 6 }}>
                     {p.coTheDuyet && <button className="nho" onClick={() => lam(() => api(`/phan-bo/${p.id}/duyet`, { method: 'POST' }), 'Đã duyệt phân bổ.')}>Duyệt</button>}
-                    {lo.quyen.phanBo && !p.cancelledAt && (
+                    {lo.quyen.phanBo && !p.cancelledAt && !p.phieuXuatKho && (
                       <button className="phu-btn nho" onClick={() => { const l = window.prompt('Lý do huỷ phân bổ'); if (l) lam(() => api(`/phan-bo/${p.id}/huy`, { body: { lyDo: l } }), 'Đã huỷ phân bổ.'); }}>Huỷ</button>
                     )}
                   </div>
@@ -268,7 +269,7 @@ export default function ChiTietLoXuat() {
             <div><label htmlFor="pbkl">Khối lượng (kg)</label><input id="pbkl" inputMode="decimal" required value={pb.khoiLuongKg} onChange={(e) => setPb({ ...pb, khoiLuongKg: e.target.value })} /></div>
             <button>Thêm phân bổ</button>
           </div>
-          <p className="phu">Nếu một lô mua được chia cho từ hai người mua trở lên, phải ghi xác nhận đồng ý của nhà cung cấp ở trang lô mua trước khi giám định.</p>
+          <p className="phu">Hàng đã nhận vào kho thì thủ kho lấy cho lô xuất bằng <Link href="/kho/xuat-kho">phiếu xuất kho</Link>; phần mềm tự quy về lô mua theo tỷ lệ nguồn gốc. Nếu một lô mua được chia cho từ hai người mua trở lên, phải ghi xác nhận đồng ý của nhà cung cấp ở trang lô mua trước khi giám định.</p>
         </form>
       )}
 

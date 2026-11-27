@@ -1,6 +1,6 @@
 # Kho và sơ chế
 
-Theo "Thiết kế phân hệ Kho và Sơ chế" (KS-1..9). Bước K1: kho, khu, nhận hàng, tồn kho, chuyển khu. Bước K2: lệnh sơ chế, định mức hao hụt, truy xuất qua sơ chế.
+Theo "Thiết kế phân hệ Kho và Sơ chế" (KS-1..9). Bước K1: kho, khu, nhận hàng, tồn kho, chuyển khu. Bước K2: lệnh sơ chế, định mức hao hụt, truy xuất qua sơ chế. Bước K3a: phiếu xuất kho cho lô xuất.
 
 ## Khu
 - Mỗi kho, xưởng (danh mục cơ sở) chia thành khu. Loại khu: khu thường, khu đủ EUDR, kho lạnh; có thể ghi sức chứa.
@@ -27,7 +27,14 @@ Theo "Thiết kế phân hệ Kho và Sơ chế" (KS-1..9). Bước K1: kho, khu
 - Nguồn gốc lô ra (KS-2): trộn theo tỷ lệ khối lượng các lô vào. Trang lô tồn có "Đường đi của hàng": lần ngược qua các lệnh sơ chế, các lần tách lô, về phiếu nhận hàng và lô mua (GET /kho/lo-ton/:id/truy-xuat).
 - Bảng tồn tách theo loại (nguyên liệu, thành phẩm, phụ phẩm), hạng và trạng thái.
 
-## Chưa làm (K3..K4)
-- Xuất kho cho lô xuất, chuyển kho khác địa điểm, kiểm kê, nhiệt độ kho lạnh.
+## Xuất kho cho lô xuất (K3a, KS-5)
+- Phiếu xuất kho (PXK-YYYY-NNNN): thủ kho được giao chọn một lô xuất đang đóng gói và các lô tồn ở kho mình, ghi khối lượng, xe, container.
+- Lô tồn xuất được: sẵn sàng (không chờ duyệt hao hụt), không phải phụ phẩm, cùng mặt hàng và loại giao dịch với lô xuất; cà phê đi EU phải đủ EUDR. Không xuất quá khối lượng hợp đồng cộng dung sai.
+- Phần mềm quy khối lượng về từng lô mua theo tỷ lệ nguồn gốc của lô tồn và ghi thành dòng phân bổ trên lô xuất (gắn mã phiếu). Các dòng này vẫn chờ Trưởng phòng KD duyệt; chia lô, đồng ý của nhà cung cấp, chứng từ, truy xuất, quyết toán đọc như trước.
+- Lô mua đã nhận vào kho thì không phân bổ thẳng nữa. Dòng phân bổ từ phiếu xuất không huỷ lẻ: thủ kho huỷ cả phiếu (khi lô xuất còn đóng gói), hàng trở về lô tồn. Huỷ lô xuất cũng huỷ các phiếu xuất còn hiệu lực.
+- Truy xuất của lô xuất ghi các kho đã nhận hàng của lô mua.
+
+## Chưa làm (K3b..K4)
+- Chuyển kho khác địa điểm, kiểm kê tháng (KS-6), nhiệt độ kho lạnh và hạn dùng (KS-9).
 - Chi phí kho, sơ chế vào quyết toán; kho thuê và kho nhà cung cấp ghi qua cổng đối tác.
-- Bước "sơ chế" và "nhập kho" cũ trên lô mua vẫn giữ cho tới K3, vì việc phân bổ lô mua vào lô xuất còn dựa vào trạng thái "đã nhập kho". K3 chuyển sang lấy hàng từ lô tồn (KS-5).
+- Bước "sơ chế" và "nhập kho" cũ trên lô mua chỉ còn dùng cho hàng không qua kho có thủ kho (kho thuê, kho nhà cung cấp) cho tới khi có cổng kho đối tác (K4, KS-4).

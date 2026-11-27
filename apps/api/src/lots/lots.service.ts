@@ -14,6 +14,8 @@ import {
   ExportLot,
   exportLots,
   facilities,
+  goodsIssues,
+  goodsReceipts,
   lotAllocations,
   lotEvents,
   partners,
@@ -38,6 +40,7 @@ import {
   toKg,
 } from './lot.rules';
 import { EUDR_SECTORS } from '../sourcing/collection.rules';
+import { returnIssuedStock } from '../warehouse/stock-return';
 
 export interface PurchaseEventInput {
   kind: 'thu_gom' | 'so_che' | 'nhap_kho';
@@ -545,6 +548,7 @@ export class LotsService {
         packingFacilityCode: purchaseLots.packingFacilityCode,
         createdByName: sql<string>`(select full_name from users u where u.id = ${lotAllocations.createdBy})`,
         approvedByName: sql<string | null>`(select full_name from users u where u.id = ${lotAllocations.approvedBy})`,
+        goodsIssueCode: sql<string | null>`(select code from goods_issues gi where gi.id = ${lotAllocations.goodsIssueId})`,
       })
       .from(lotAllocations)
       .innerJoin(purchaseLots, eq(purchaseLots.id, lotAllocations.purchaseLotId))
@@ -578,6 +582,7 @@ export class LotsService {
         approvedAt: x.a.approvedAt,
         cancelledAt: x.a.cancelledAt,
         cancelReason: x.a.cancelReason,
+        phieuXuatKho: x.goodsIssueCode,
         biChia: x.a.cancelledAt ? false : (view.get(x.a.purchaseLotId)?.split ?? false),
         nccDongY: x.a.cancelledAt ? false : (view.get(x.a.purchaseLotId)?.consented ?? false),
         coTheDuyet: !x.a.cancelledAt && !x.a.approvedAt && this.canManageAll(ctx) && x.a.createdBy !== ctx.user.id && lot.status === 'dong_goi',
@@ -609,6 +614,8 @@ export class LotsService {
       this.assertCanManage(exp, ctx);
       const lot = await this.lockPurchaseLot(input.purchaseLotId, tx);
       if (!this.canManage(lot, ctx)) throw new ForbiddenException('Bạn chỉ phân bổ được lô mua do mình phụ trách');
+      const [inStock] = await tx.select({ id: goodsReceipts.id }).from(goodsReceipts).where(and(eq(goodsReceipts.purchaseLotId, lot.id), isNull(goodsReceipts.voidedAt))).limit(1);
+      if (inStock) throw new BadRequestException('Hàng của lô mua này đã nhận vào kho: thủ kho lấy hàng cho lô xuất bằng phiếu xuất kho từ lô tồn');
       const [{ allocated }] = await tx
         .select({ allocated: sql<number>`coalesce(sum(${lotAllocations.quantityKg}), 0)::float8` })
         .from(lotAllocations)
@@ -653,6 +660,7 @@ export class LotsService {
       this.assertCanManage(exp, ctx);
       if (a.cancelledAt) throw new BadRequestException('Dòng phân bổ đã huỷ');
       if (exp.status !== 'dong_goi') throw new BadRequestException('Chỉ huỷ phân bổ khi lô xuất đang ở bước đóng gói');
+      if (a.goodsIssueId) throw new BadRequestException('Dòng này đến từ phiếu xuất kho: thủ kho huỷ phiếu xuất kho để trả hàng về kho');
       await tx.update(lotAllocations).set({ cancelledAt: new Date(), cancelReason: reason }).where(eq(lotAllocations.id, id));
       await this.event({ exportLotId: a.exportLotId, purchaseLotId: a.purchaseLotId, kind: 'huy_phan_bo', quantityKg: a.quantityKg, note: reason }, ctx, tx);
       await this.documents.syncChecklist(exp, ctx, tx);
@@ -738,9 +746,40 @@ export class LotsService {
         .update(lotAllocations)
         .set({ cancelledAt: now, cancelReason: `Huỷ lô xuất: ${reason}` })
         .where(and(eq(lotAllocations.exportLotId, id), isNull(lotAllocations.cancelledAt)));
+      const issues = await tx.select({ id: goodsIssues.id }).from(goodsIssues).where(and(eq(goodsIssues.exportLotId, id), isNull(goodsIssues.voidedAt)));
+      for (const g of issues) await returnIssuedStock(tx, g.id, ctx.user.id, `Huỷ lô xuất: ${reason}`);
       await tx.update(exportLots).set({ status: 'da_huy', cancelReason: reason, updatedAt: now }).where(eq(exportLots.id, id));
       await this.event({ exportLotId: id, kind: 'huy', note: reason }, ctx, tx);
     });
+  }
+
+  // ---------- Phân bổ từ phiếu xuất kho (KS-5) ----------
+
+  /** Ghi các dòng phân bổ quy từ phiếu xuất kho về lô mua. Dòng vẫn chờ Trưởng phòng KD duyệt như phân bổ thường. */
+  async allocateFromIssue(exp: ExportLot, rows: { purchaseLotId: string; quantityKg: number }[], issue: { id: string; code: string }, ctx: AuthContext, tx: DbExecutor) {
+    for (const r of rows) {
+      await tx.insert(lotAllocations).values({ purchaseLotId: r.purchaseLotId, exportLotId: exp.id, quantityKg: r.quantityKg, goodsIssueId: issue.id, createdBy: ctx.user.id });
+      await this.event({ exportLotId: exp.id, purchaseLotId: r.purchaseLotId, kind: 'phan_bo', quantityKg: r.quantityKg, note: `Xuất kho ${issue.code} → ${exp.code}` }, ctx, tx);
+    }
+    await this.documents.syncChecklist(exp, ctx, tx);
+  }
+
+  /** Huỷ các dòng phân bổ của một phiếu xuất kho bị huỷ. */
+  async releaseIssue(exp: ExportLot, issue: { id: string; code: string }, reason: string, ctx: AuthContext, tx: DbExecutor) {
+    const rows = await tx
+      .update(lotAllocations)
+      .set({ cancelledAt: new Date(), cancelReason: `Huỷ phiếu xuất kho ${issue.code}: ${reason}` })
+      .where(and(eq(lotAllocations.goodsIssueId, issue.id), isNull(lotAllocations.cancelledAt)))
+      .returning();
+    for (const a of rows) await this.event({ exportLotId: exp.id, purchaseLotId: a.purchaseLotId, kind: 'huy_phan_bo', quantityKg: a.quantityKg, note: `Huỷ ${issue.code}: ${reason}` }, ctx, tx);
+    await this.documents.syncChecklist(exp, ctx, tx);
+  }
+
+  /** Khối lượng theo hợp đồng đối ứng của lô xuất và dung sai, để thủ kho không xuất quá. */
+  async contractWindow(exp: ExportLot, exec: DbExecutor) {
+    const s = await this.contractsService.signedTerms(exp.counterContractId, exec);
+    if (!s) return null;
+    return { contractKg: exp.plannedKg ?? toKg(s.terms.soLuong, s.terms.donVi), tolerancePct: s.terms.dungSaiPhanTram ?? 0 };
   }
 
   // ---------- Nội bộ ----------

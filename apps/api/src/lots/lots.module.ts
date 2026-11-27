@@ -17,6 +17,7 @@ import { PortalService } from './portal.service';
 @Module({
   imports: [AuditModule, ContractsModule],
   controllers: [PurchaseLotsController, ExportLotsController, AllocationsController, LotDocumentsController, DocumentsController, DocRulesController, FeeRequestsController, FilesController, PortalController, PartnerPortalAccountsController, MisaController, EudrController, TraceController],
+  exports: [LotsService],
   providers: [LotsService, EudrService, TraceService, DocumentsService, PortalService, MisaService, { provide: FILE_STORE, useClass: LocalFileStore }],
 })
 export class LotsModule {}
