@@ -64,6 +64,7 @@ describe('Bảng phân quyền', () => {
       expect(p.includes('KHO_CAU_HINH')).toBe(r === 'TRUONG_PHONG_KD' || r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC');
       expect(p.includes('SO_CHE_DUYET')).toBe(r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC');
       expect(p.includes('SO_CHE_DINH_MUC')).toBe(r === 'GIAM_DOC' || r === 'PHO_GIAM_DOC');
+      expect(p.includes('KIEM_KE_DUYET')).toBe(r === 'KE_TOAN_TRUONG');
     }
     expect(permissionsFor(['THU_KHO'])).toEqual(['KHO_XEM', 'KHO_GHI_PHIEU']);
     expect(requiresTwoFactor(['THU_KHO'])).toBe(true);

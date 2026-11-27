@@ -131,6 +131,8 @@ export const PERMISSIONS = [
   'SO_CHE_DINH_MUC',
   /** Duyệt lệnh sơ chế có hao hụt vượt định mức (KS-3) */
   'SO_CHE_DUYET',
+  /** Duyệt kết quả kiểm kê có lô lệch quá 0,5% (KS-6) */
+  'KIEM_KE_DUYET',
   // Danh mục
   'DANH_MUC_QUAN_LY',
   // Quản trị
@@ -186,6 +188,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'CONG_NO_XEM',
     'HAN_MUC_DE_XUAT',
     'KHO_XEM',
+    'KIEM_KE_DUYET',
   ],
   TRUONG_PHONG_KD: [
     'HOP_DONG_XEM_TAT_CA',

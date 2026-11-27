@@ -34,7 +34,19 @@ Theo "Thiết kế phân hệ Kho và Sơ chế" (KS-1..9). Bước K1: kho, khu
 - Lô mua đã nhận vào kho thì không phân bổ thẳng nữa. Dòng phân bổ từ phiếu xuất không huỷ lẻ: thủ kho huỷ cả phiếu (khi lô xuất còn đóng gói), hàng trở về lô tồn. Huỷ lô xuất cũng huỷ các phiếu xuất còn hiệu lực.
 - Truy xuất của lô xuất ghi các kho đã nhận hàng của lô mua.
 
-## Chưa làm (K3b..K4)
-- Chuyển kho khác địa điểm, kiểm kê tháng (KS-6), nhiệt độ kho lạnh và hạn dùng (KS-9).
+## Chuyển kho (K3b)
+- Phiếu chuyển kho (CK-YYYY-NNNN): thủ kho của kho đi chọn lô tồn sẵn sàng, kho đến (khác kho đi; trong cùng kho thì dùng chuyển khu), khối lượng, xe. Hàng trừ khỏi lô tồn ngay và "đang đi đường".
+- Thủ kho của kho đến cân lại, chọn khu (vẫn theo quy tắc khu: EUDR, kho lạnh, sức chứa) và nhận. Phần mềm sinh lô tồn mới ở kho đến, cùng mặt hàng, hạng, loại giao dịch, EUDR và cùng nguồn gốc lô mua. Không nhận nhiều hơn số đã gửi; phần thiếu là hao hụt vận chuyển, ghi trên phiếu.
+- Khi chưa nhận, kho đi huỷ được phiếu (ghi lý do), hàng về lại lô tồn.
+- Truy xuất lô nhận về có bước "Chuyển kho" rồi đi tiếp về lô ở kho đi.
+
+## Kiểm kê tháng (K3b, KS-6)
+- Thủ kho mở đợt (KK-YYYY-NNNN) cho kho mình; mỗi kho chỉ một đợt chưa xong. Mở đợt thì chụp số sổ của mọi lô tồn còn hàng.
+- Thủ kho ghi số đếm từng lô (lưu nhiều lần được), rồi chốt khi đã đếm đủ.
+- Không lô nào lệch quá 0,5%: sổ điều chỉnh ngay. Có lô lệch hơn: chờ Kế toán trưởng (KIEM_KE_DUYET) duyệt thì điều chỉnh, trả lại (ghi lý do) thì sổ giữ nguyên và thủ kho mở đợt mới để đếm lại.
+- Điều chỉnh theo phần chênh (đếm trừ sổ lúc mở), nên hàng ra vào trong lúc đếm vẫn giữ đúng. Mỗi điều chỉnh là một dòng "kiểm kê" trong sổ kho của lô.
+
+## Chưa làm (K3c..K4)
+- Nhiệt độ kho lạnh và hạn dùng (KS-9).
 - Chi phí kho, sơ chế vào quyết toán; kho thuê và kho nhà cung cấp ghi qua cổng đối tác.
 - Bước "sơ chế" và "nhập kho" cũ trên lô mua chỉ còn dùng cho hàng không qua kho có thủ kho (kho thuê, kho nhà cung cấp) cho tới khi có cổng kho đối tác (K4, KS-4).

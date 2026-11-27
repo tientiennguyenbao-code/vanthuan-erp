@@ -85,7 +85,7 @@ export default function LoTon() {
           <div className="luoi">
             <div className="o"><div className="phu">Đang ở</div><div className="so-lon">{d.zoneCode}</div><div className="phu">{d.zoneName}, {d.facilityName}</div></div>
             <div className="o"><div className="phu">Còn lại</div><div className="so-lon">{kg(d.remainingKg)}</div><div className="phu">ban đầu {kg(d.initialKg)}{d.bags ? ` · ${d.bags} bao` : ''}</div></div>
-            <div className="o"><div className="phu">Ngày nhận</div><div className="so-lon">{ngay(d.receivedOn)}</div>{d.parentId && <div className="phu">tách từ <Link href={`/kho/lo-ton/${d.parentId}`}>lô gốc</Link></div>}</div>
+            <div className="o"><div className="phu">Ngày nhận</div><div className="so-lon">{ngay(d.receivedOn)}</div>{d.parentId && <div className="phu">{d.source === 'chuyen_kho' ? 'chuyển từ' : 'tách từ'} <Link href={`/kho/lo-ton/${d.parentId}`}>lô gốc</Link></div>}</div>
           </div>
 
           <h2>Nguồn gốc</h2>
@@ -104,7 +104,7 @@ export default function LoTon() {
           {buoc.length > 0 && (
             <>
               <h2>Đường đi của hàng</h2>
-              <p className="phu">Lần ngược từ lô này về phiếu nhận hàng và lô mua, qua các lệnh sơ chế và các lần tách lô.</p>
+              <p className="phu">Lần ngược từ lô này về phiếu nhận hàng và lô mua, qua các lệnh sơ chế, các lần tách lô và chuyển kho.</p>
               <ol className="chuoi">
                 {buoc.map((b, i) => (
                   <li key={`${b.ref}-${i}`} style={{ marginLeft: b.level * 20 }}>

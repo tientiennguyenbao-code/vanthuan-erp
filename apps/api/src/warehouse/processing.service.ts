@@ -18,6 +18,7 @@ import {
   stockLotOrigins,
   stockLots,
   stockMoves,
+  stockTransfers,
   users,
 } from '../db/schema';
 import { blendShares, capacityRefusal, inputsRefusal, massBalance, needsApproval, PROCESSING_STEPS, stepLabel, zoneRefusal } from './kho.rules';
@@ -278,6 +279,17 @@ export class ProcessingService {
           steps.push({ level, kind: 'so_che', ref: o.o.code, label: stepLabel(o.sector, o.o.step), detail: orderDetail(o.o), lots: ins.map((i) => `${i.code} (${r2(i.kg).toLocaleString('vi-VN')} kg)`) });
         }
         for (const i of ins) await walk(i.id, level + 1);
+      } else if (s.source === 'chuyen_kho' && s.parentId) {
+        const [t] = await this.db
+          .select({ t: stockTransfers, fromName: facilities.name, parentCode: sql<string>`(select code from stock_lots p where p.id = ${stockTransfers.stockLotId})` })
+          .from(stockTransfers)
+          .innerJoin(facilities, eq(facilities.id, stockTransfers.fromFacilityId))
+          .where(eq(stockTransfers.receivedStockLotId, id));
+        if (t) {
+          const f = (n: number) => r2(n).toLocaleString('vi-VN');
+          steps.push({ level, kind: 'chuyen_kho', ref: t.t.code, label: 'Chuyển kho', detail: `từ ${t.fromName}: gửi ${f(t.t.quantityKg)} kg ngày ${dmy(t.t.sentOn)}, nhận ${f(t.t.receivedKg ?? 0)} kg ngày ${dmy(t.t.receivedOn ?? t.t.sentOn)}`, lots: [t.parentCode] });
+        }
+        await walk(s.parentId, level + 1);
       } else if (s.source === 'tach_lo' && s.parentId) {
         const [p] = await this.db.select({ code: stockLots.code }).from(stockLots).where(eq(stockLots.id, s.parentId));
         steps.push({ level, kind: 'tach_lo', ref: s.code, label: 'Tách lô', detail: `${s.code} tách từ ${p.code}`, lots: [p.code] });

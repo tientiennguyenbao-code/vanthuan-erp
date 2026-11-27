@@ -216,3 +216,29 @@ export function toPurchaseLots(lines: { quantityKg: number; origins: { purchaseL
   if (rows.length) rows[0].quantityKg = r2(rows[0].quantityKg + total - rows.reduce((s, x) => s + x.quantityKg, 0));
   return rows.filter((x) => x.quantityKg > 0);
 }
+
+// ---------- Kiểm kê (KS-6) ----------
+
+/** Lô lệch quá mức này (tính trên số sổ) thì Kế toán trưởng phải duyệt trước khi điều chỉnh. */
+export const COUNT_TOLERANCE_PCT = 0.5;
+
+export function countVariance(bookKg: number, countedKg: number) {
+  const diffKg = r2(countedKg - bookKg);
+  const diffPct = bookKg > 0 ? r2((diffKg / bookKg) * 100) : countedKg > 0 ? 100 : 0;
+  return { diffKg, diffPct, overTolerance: Math.abs(diffPct) > COUNT_TOLERANCE_PCT + 1e-9 };
+}
+
+/** Tháng kiểm kê dạng YYYY-MM từ ngày đếm. */
+export function countPeriod(countedOn: string): string {
+  return countedOn.slice(0, 7);
+}
+
+// ---------- Chuyển kho ----------
+
+export function transferRefusal(lot: { code: string; facilityId: string; status: string; remainingKg: number }, toFacilityId: string, quantityKg: number): string | null {
+  if (lot.facilityId === toFacilityId) return 'Kho đến phải khác kho đi (chuyển trong cùng kho thì dùng chuyển khu)';
+  if (lot.status !== 'san_sang') return `${lot.code} đang chờ duyệt hao hụt, chưa chuyển được`;
+  if (!(quantityKg > 0)) return 'Khối lượng chuyển phải lớn hơn 0';
+  if (quantityKg > lot.remainingKg + 0.005) return `${lot.code} chỉ còn ${fmtKg(lot.remainingKg)} kg`;
+  return null;
+}
